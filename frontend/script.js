@@ -226,6 +226,8 @@ function firebaseLogin(providerType) {
         provider = new firebase.auth.GoogleAuthProvider();
     } else if (providerType === 'github') {
         provider = new firebase.auth.GithubAuthProvider();
+    } else if (providerType === 'microsoft') {
+        provider = new firebase.auth.OAuthProvider('microsoft.com');
     }
 
     auth.signInWithPopup(provider)
@@ -1146,4 +1148,5 @@ window.saveResumeData = saveResumeData;
 window.generateResumePreview = generateResumePreview;
 window.downloadResumePDF = downloadResumePDF;
 window.checkATSCompatibility = checkATSCompatibility;
+
 window.signOut = signOut;
