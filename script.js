@@ -376,10 +376,10 @@ function updateSidebarFromStorage() {
     
     if (uname && users[uname]) {
         profileName.textContent = users[uname].name || uname;
-        profilePic.src = users[uname].profilePic || 'https://via.placeholder.com/44/6C5CE7/FFFFFF?text=U';
+        profilePic.src = users[uname].profilePic || 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F036%2F885%2F313%2Foriginal%2Fblue-profile-icon-free-png.png&f=1&nofb=1&ipt=835f4c686ca5c7c40c36d1d27d110a772754ba33d4d707b84606d4cf250ecde1';
     } else {
         profileName.textContent = 'Guest';
-        profilePic.src = 'https://via.placeholder.com/44/6C5CE7/FFFFFF?text=U';
+        profilePic.src = 'https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F036%2F885%2F313%2Foriginal%2Fblue-profile-icon-free-png.png&f=1&nofb=1&ipt=835f4c686ca5c7c40c36d1d27d110a772754ba33d4d707b84606d4cf250ecde1';
     }
 }
 
@@ -508,8 +508,12 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Google Custom Search API Configuration
+const API_KEY1 = "AIzaSyAi5rx05D2SrmJq7zxG7HlgINV-oCXq1m4";
+const CX1 = "f145be49827604fd6";
+
 // Events Functions
-function loadEventsByMajor() {
+async function loadEventsByMajor() {
     const major = document.getElementById("majorSelect")?.value;
     const container = document.getElementById("eventsContainer");
     
@@ -520,18 +524,158 @@ function loadEventsByMajor() {
         return; 
     }
     
-    const selectedEvents = eventsData[major] || [];
-    container.innerHTML = selectedEvents.map(e => `
-        <div class="card event-card">
-            <img src="${e.img}" alt="${e.title}" onerror="this.src='https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=EVENT'">
-            <div style="flex:1">
-                <h3>${e.title}</h3>
-                <p style="color:var(--muted);margin:5px 0">${e.desc}</p>
-                <button class="btn" style="font-size:0.85rem;padding:6px 12px">RSVP</button>
+    // Show loading state
+    container.innerHTML = `<div class="card" style="text-align:center;color:var(--muted);padding:40px"><p>Loading events...</p></div>`;
+    
+    // Define search queries for each major (focused on events)
+    const eventQueries = {
+        cs: "computer science events conferences workshops Egypt 2024",
+        masscomm: "mass communication media events conferences Egypt 2024",
+        business: "business events conferences networking Egypt 2024",
+        engineering: "engineering events conferences workshops Egypt 2024",
+        medicine: "medical events conferences healthcare Egypt 2024"
+    };
+    
+    // Use specific query for the major, or fallback to general events query
+    const searchQuery = eventQueries[major] || "events conferences Egypt 2024";
+    
+    try {
+        const res = await fetch(
+            `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(searchQuery)}&key=${API_KEY1}&cx=${CX1}`
+        );
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        
+        // Check if we have results
+        if (!data.items || data.items.length === 0) {
+            container.innerHTML = `
+                <div class="card" style="text-align:center;color:var(--muted);padding:40px">
+                    <p>No events found for ${major}. Try a different major.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Map API results to event cards
+        const eventsHTML = data.items.map(item => {
+            // Extract event information from the search result
+            const title = item.title || 'Event';
+            const description = item.snippet || 'No description available';
+            const link = item.link || '#';
+            const displayLink = item.displayLink || 'Unknown source';
+            
+            // Use a placeholder image or try to extract from pagemap if available
+            let imageUrl = 'https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=EVENT';
+            if (item.pagemap && item.pagemap.cse_thumbnail) {
+                imageUrl = item.pagemap.cse_thumbnail[0].src;
+            } else if (item.pagemap && item.pagemap.cse_image) {
+                imageUrl = item.pagemap.cse_image[0].src;
+            }
+            
+            return `
+                <div class="card event-card">
+                    <img src="${imageUrl}" alt="${title}" 
+                         onerror="this.src='https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=EVENT'">
+                    <div style="flex:1">
+                        <h3>${title}</h3>
+                        <p style="color:var(--muted);margin:5px 0">${description}</p>
+                        <div style="font-size:0.85rem;color:var(--primary);margin:5px 0">
+                            <strong>Source:</strong> ${displayLink}
+                        </div>
+                        <a href="${link}" target="_blank" class="btn" style="font-size:0.85rem;padding:6px 12px;display:inline-block;text-decoration:none;">
+                            Learn More
+                        </a>
+                    </div>
+                </div>
+            `;
+        }).join("");
+        
+        container.innerHTML = eventsHTML;
+        
+    } catch (error) {
+        console.error("Error fetching events:", error);
+        
+        // Fallback to dummy data if API fails
+        const fallbackEvents = getFallbackEvents(major);
+        container.innerHTML = fallbackEvents.map(e => `
+            <div class="card event-card">
+                <img src="${e.img}" alt="${e.title}" onerror="this.src='https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=EVENT'">
+                <div style="flex:1">
+                    <h3>${e.title}</h3>
+                    <p style="color:var(--muted);margin:5px 0">${e.desc}</p>
+                    <button class="btn" style="font-size:0.85rem;padding:6px 12px">RSVP</button>
+                </div>
             </div>
-        </div>
-    `).join("");
+        `).join("");
+    }
 }
+
+// Fallback data in case API fails
+function getFallbackEvents(major) {
+    const fallbackData = {
+        cs: [
+            {
+                title: "Cairo Tech Summit 2024",
+                desc: "Annual technology conference for developers and IT professionals",
+                img: "https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=TECH"
+            },
+            {
+                title: "AI & Machine Learning Workshop",
+                desc: "Hands-on workshop on artificial intelligence applications",
+                img: "https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=AI"
+            }
+        ],
+        masscomm: [
+            {
+                title: "Media Innovation Forum",
+                desc: "Exploring new trends in digital media and communication",
+                img: "https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=MEDIA"
+            }
+        ],
+        business: [
+            {
+                title: "Startup Egypt Conference",
+                desc: "Networking event for entrepreneurs and investors",
+                img: "https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=BUSINESS"
+            }
+        ],
+        engineering: [
+            {
+                title: "Egypt Engineering Expo",
+                desc: "Exhibition of latest engineering technologies and innovations",
+                img: "https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=ENGINEERING"
+            }
+        ],
+        medicine: [
+            {
+                title: "Medical Innovations Conference",
+                desc: "Latest advancements in healthcare and medical technology",
+                img: "https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=MEDICINE"
+            }
+        ]
+    };
+    
+    return fallbackData[major] || [
+        {
+            title: "Upcoming Events",
+            desc: "Check back soon for event announcements",
+            img: "https://via.placeholder.com/140x100/6C5CE7/FFFFFF?text=EVENTS"
+        }
+    ];
+}
+
+// Optional: Function to pre-fetch events on page load for popular majors
+async function preloadEvents() {
+    console.log("Preloading events data...");
+    // You can add preloading logic here if needed
+}
+
+// Call preload on page load
+document.addEventListener('DOMContentLoaded', preloadEvents);
 
 // Jobs Functions
 function renderJobs() {
@@ -551,6 +695,467 @@ function renderJobs() {
         </div>
     `).join('');
 }
+
+const API_KEY = "AIzaSyC6inQR02r9m0vQw0fS6xRgEfdss3eyQtY";
+const CX = "5213063cc32844bd3";
+
+// Function to perform a Google Custom Search
+async function searchGoogle(query, startIndex = 1) {
+    const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${API_KEY}&cx=${CX}&start=${startIndex}`;
+    
+    try {
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Check if API returned an error
+        if (data.error) {
+            throw new Error(data.error.message || "Google API error");
+        }
+        
+        return {
+            items: data.items || [],
+            searchInformation: data.searchInformation || {},
+            queries: data.queries || {}
+        };
+        
+    } catch (error) {
+        console.error("Search error:", error.message);
+        throw error;
+    }
+}
+
+// Main function to load scholarships by major
+async function loadScholarshipsByMajor(major = null) {
+    // If no major provided, get from select element
+    const majorSelect = document.getElementById("scholarshipMajorSelect");
+    
+    if (!major) {
+        major = majorSelect ? majorSelect.value : null;
+    }
+    
+    const container = document.getElementById("scholarshipsContainer");
+
+    if (!major) {
+        console.log("No major selected");
+        if (container) {
+            container.innerHTML = `
+                <div class="card" style="text-align:center;color:var(--muted);padding:40px">
+                    <p>Please select a major to see relevant scholarships</p>
+                </div>
+            `;
+        }
+        return null;
+    }
+
+    console.log(`Selected major: ${major}`);
+    
+    if (container) {
+        container.innerHTML = `
+            <div class="card" style="text-align:center;padding:40px">
+                <div style="
+                    border: 3px solid var(--muted);
+                    border-top: 3px solid var(--primary);
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 20px;
+                "></div>
+                <p>Searching for scholarships in ${getMajorName(major)}...</p>
+                <style>
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            </div>
+        `;
+    }
+
+    // Define search queries for different majors
+    const queries = {
+        cs: "computer science scholarship Egypt 2024 2025",
+        masscomm: "mass communication scholarship Egypt media studies",
+        business: "business scholarship Egypt MBA undergraduate",
+        engineering: "engineering scholarship Egypt civil mechanical electrical",
+        medicine: "medicine scholarship Egypt medical school undergraduate"
+    };
+
+    // More specific queries for better results
+    const enhancedQueries = {
+        cs: "(computer science OR software engineering OR IT) scholarship Egypt (fully funded OR partial) 2024 site:.edu OR site:.org",
+        masscomm: "(mass communication OR journalism OR media studies) scholarship Egypt",
+        business: "(business administration OR MBA OR finance) scholarship Egypt (international OR local)",
+        engineering: "(engineering OR mechanical OR civil OR electrical) scholarship Egypt undergraduate",
+        medicine: "(medicine OR medical OR healthcare) scholarship Egypt (MBBS OR undergraduate)"
+    };
+
+    const searchQuery = enhancedQueries[major] || queries[major] || `${major} scholarship Egypt`;
+    console.log(`Searching for: ${searchQuery}`);
+
+    try {
+        const result = await searchGoogle(searchQuery);
+        
+        console.log(`Found ${result.items.length} results for ${major}:`);
+        
+        // Log each result to console
+        result.items.forEach((item, index) => {
+            console.log(`\n--- Result ${index + 1} ---`);
+            console.log(`Title: ${item.title}`);
+            console.log(`Description: ${item.snippet}`);
+            console.log(`Link: ${item.link}`);
+        });
+
+        // Update DOM if container exists
+        if (container) {
+            if (result.items.length === 0) {
+                container.innerHTML = `
+                    <div class="card" style="background:var(--light-warning);border:1px solid var(--warning);padding:30px;text-align:center">
+                        <h3 style="color:var(--dark-warning);margin-top:0">No Scholarships Found</h3>
+                        <p style="color:var(--muted);margin-bottom:20px">
+                            No scholarships found for ${getMajorName(major)}. 
+                            Try a different major or check back later.
+                        </p>
+                        <button onclick="retrySearch('${major}')" class="btn" style="background:var(--warning);color:white">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = result.items.map((item, index) => {
+                    // Clean up title and snippet
+                    const cleanTitle = item.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+                    const cleanSnippet = item.snippet.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+                    const domain = extractDomain(item.link);
+                    
+                    return `
+                    <div class="card event-card" style="margin-bottom:20px;padding:20px;border:1px solid var(--border);border-radius:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:15px">
+                            <h3 style="margin:0;font-size:1.1em;color:var(--dark);flex:1">${cleanTitle}</h3>
+                            <span style="background:var(--primary);color:white;padding:2px 10px;border-radius:12px;font-size:0.8em;margin-left:10px">
+                                #${index + 1}
+                            </span>
+                        </div>
+                        
+                        <p style="color:var(--muted);line-height:1.6;margin-bottom:15px;font-size:0.95em">
+                            ${cleanSnippet}
+                        </p>
+                        
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:15px;border-top:1px solid var(--border-light)">
+                            <span style="font-size:0.85em;color:var(--muted); padding:10px">
+                                ${domain}
+                            </span>
+                            <div style="display:flex;gap:10px">
+                                <button onclick="saveScholarship('${encodeURIComponent(JSON.stringify(item))}')" 
+                                        style="background:var(--primary);color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:0.9em">
+                                    Save
+                                </button>
+                                <a href="${item.link}" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   style="background:var(--primary);color:white;text-decoration:none;padding:8px 16px;border-radius:4px;font-size:0.9em">
+                                    View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `}).join("");
+                
+                // Add search statistics at the top
+                const statsDiv = document.createElement('div');
+                statsDiv.style.cssText = `
+                    background: var(--light);
+                    padding: 12px 20px;
+                    border-radius: 6px;
+                    margin-bottom: 20px;
+                    font-size: 0.9em;
+                    color: var(--muted);
+                    border: 1px solid var(--border-light);
+                `;
+                statsDiv.innerHTML = `
+                    <span>Found ${result.items.length} scholarships in ${result.searchInformation?.formattedSearchTime || 'unknown'} seconds</span>
+                    ${result.searchInformation?.totalResults ? 
+                        `<span style="margin-left:15px">• Total available: ${result.searchInformation.totalResults}</span>` : ''}
+                `;
+                container.insertBefore(statsDiv, container.firstChild);
+            }
+        }
+
+        return result.items;
+
+    } catch (error) {
+        console.error("Error fetching scholarships:", error.message);
+        
+        if (container) {
+            container.innerHTML = `
+                <div class="card" style="background:var(--light-error);border:1px solid var(--error);padding:30px;text-align:center">
+                    <h3 style="color:var(--dark-error);margin-top:0">Error Loading Scholarships</h3>
+                    <p style="color:var(--muted);margin-bottom:20px">
+                        ${error.message.includes('quota') ? 
+                            'Search quota exceeded. Please try again later.' : 
+                            'Failed to load scholarships. Please check your internet connection.'}
+                    </p>
+                    <button onclick="loadScholarshipsByMajor('${major}')" 
+                            class="btn" 
+                            style="background:var(--error);color:white">
+                        Retry Search
+                    </button>
+                </div>
+            `;
+        }
+        
+        return null;
+    }
+}
+
+// Helper function to get full major name
+function getMajorName(majorCode) {
+    const majorNames = {
+        cs: "Computer Science",
+        masscomm: "Mass Communication",
+        business: "Business",
+        engineering: "Engineering",
+        medicine: "Medicine"
+    };
+    return majorNames[majorCode] || majorCode;
+}
+
+// Helper function to extract domain from URL
+function extractDomain(url) {
+    try {
+        const domain = new URL(url).hostname.replace('www.', '');
+        return domain.length > 30 ? domain.substring(0, 27) + '...' : domain;
+    } catch {
+        // If URL parsing fails, try to extract domain manually
+        const match = url.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i);
+        return match ? match[1].substring(0, 30) : url.substring(0, 30);
+    }
+}
+
+// Function to save a scholarship
+function saveScholarship(itemData) {
+    try {
+        const item = JSON.parse(decodeURIComponent(itemData));
+        const saved = JSON.parse(localStorage.getItem('savedScholarships') || '[]');
+        
+        // Check if already saved
+        const isAlreadySaved = saved.some(savedItem => savedItem.link === item.link);
+        
+        if (isAlreadySaved) {
+            alert('This scholarship is already saved!');
+            return;
+        }
+        
+        saved.push({
+            ...item,
+            savedDate: new Date().toISOString(),
+            major: document.getElementById('scholarshipMajorSelect').value
+        });
+        localStorage.setItem('savedScholarships', JSON.stringify(saved));
+        
+        // Show success message
+        showNotification('Scholarship saved successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Error saving scholarship:', error);
+        showNotification('Error saving scholarship', 'error');
+    }
+}
+
+// Function to retry search
+function retrySearch(major) {
+    loadScholarshipsByMajor(major);
+}
+
+// Function to show notification
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 6px;
+        color: white;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        max-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    if (type === 'success') {
+        notification.style.background = 'var(--success)';
+    } else if (type === 'error') {
+        notification.style.background = 'var(--error)';
+    } else {
+        notification.style.background = 'var(--primary)';
+    }
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+    
+    // Add CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Function to view saved scholarships
+function viewSavedScholarships() {
+    const container = document.getElementById('scholarshipsContainer');
+    const saved = JSON.parse(localStorage.getItem('savedScholarships') || '[]');
+    
+    if (container) {
+        if (saved.length === 0) {
+            container.innerHTML = `
+                <div class="card" style="text-align:center;color:var(--muted);padding:40px">
+                    <p>No saved scholarships yet. Search and save scholarships to see them here.</p>
+                </div>
+            `;
+        } else {
+            container.innerHTML = saved.map((item, index) => {
+                const cleanTitle = item.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+                const cleanSnippet = item.snippet.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+                const savedDate = new Date(item.savedDate).toLocaleDateString();
+                
+                return `
+                <div class="card event-card" style="margin-bottom:20px;padding:20px;border:2px solid var(--primary-light);border-radius:8px;background:var(--light)">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+                        <h3 style="margin:0;font-size:1.1em;color:var(--dark);flex:1">
+                            ${cleanTitle}
+                        </h3>
+                        <span style="background:var(--success);color:white;padding:2px 10px;border-radius:12px;font-size:0.8em;margin-left:10px">
+                            Saved
+                        </span>
+                    </div>
+                    
+                    <p style="color:var(--muted);line-height:1.6;margin-bottom:10px;font-size:0.95em">
+                        ${cleanSnippet}
+                    </p>
+                    
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:15px;border-top:1px solid var(--border-light)">
+                        <div style="font-size:0.85em;color:var(--muted)">
+                            <span>Saved on: ${savedDate}</span>
+                            <span style="margin-left:15px">• Major: ${getMajorName(item.major)}</span>
+                        </div>
+                        <div style="display:flex;gap:10px">
+                            <button onclick="removeSavedScholarship(${index})" 
+                                    style="background:var(--primary);color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:0.9em">
+                                Remove
+                            </button>
+                            <a href="${item.link}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               style="background:var(--primary);color:white;text-decoration:none;padding:8px 16px;border-radius:4px;font-size:0.9em">
+                                View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+            
+            // Add header
+            const header = document.createElement('div');
+            header.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 2px solid var(--border);
+            `;
+            header.innerHTML = `
+                <h3 style="margin:0">Saved Scholarships (${saved.length})</h3>
+                <button onclick="loadScholarshipsByMajor()" 
+                        style="background:var(--secondary);color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer">
+                    ← Back to Search
+                </button>
+            `;
+            container.insertBefore(header, container.firstChild);
+        }
+    }
+}
+
+// Function to remove saved scholarship
+function removeSavedScholarship(index) {
+    const saved = JSON.parse(localStorage.getItem('savedScholarships') || '[]');
+    saved.splice(index, 1);
+    localStorage.setItem('savedScholarships', JSON.stringify(saved));
+    showNotification('Scholarship removed', 'success');
+    viewSavedScholarships();
+}
+
+
+// Test the API connection
+async function testAPIConnection() {
+    console.log("Testing API connection...");
+    
+    try {
+        const testResult = await searchGoogle("scholarship");
+        console.log("API Connection Successful!");
+        console.log(`Total results: ${testResult.searchInformation?.totalResults || 'Unknown'}`);
+        console.log(`Search time: ${testResult.searchInformation?.formattedSearchTime || 'Unknown'} seconds`);
+        return true;
+    } catch (error) {
+        console.error("API Connection Failed:", error.message);
+        return false;
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("Scholarship Search Tool Initialized");
+    
+    // Test API connection (optional)
+    // await testAPIConnection();
+    
+    // Add a button to view saved scholarships if not already present
+    const header = document.querySelector('#scholarships .page-header');
+    if (header) {
+        const savedButton = document.createElement('button');
+        savedButton.textContent = 'View Saved Scholarships';
+        savedButton.className = 'btn';
+        savedButton.style.cssText = `
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        `;
+        savedButton.onclick = viewSavedScholarships;
+        header.appendChild(savedButton);
+    }
+});
+
 
 // Resume Functions
 function showResumeForm() {
@@ -1462,7 +2067,7 @@ function closeCourseModal() {
 
 
 
-const PROTECTED_PAGES = new Set(['dashboard','faculty','events','resume','jobs','xai','profile','courses']);
+const PROTECTED_PAGES = new Set(['dashboard','faculty','events','resume','jobs','xai','profile','courses','scholarships']);
 
 function navigateTo(id) {
   const logged = sessionStorage.getItem('edumate_logged') === '1';

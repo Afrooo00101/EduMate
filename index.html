@@ -25,7 +25,18 @@
     <header class="header">
         <div class="logo">
             <img src="Edumate.logo-removebg-preview (1).png" alt="Logo" onerror="this.style.display='none'"> 
-            <span>EduMate</span>
+
+            <button id="sidebar-toggle" class="btn-icon">☰</button>
+
+            <!-- <span>EduMate</span> -->
+            <!-- <a href="#" onclick="navigateTo('dashboard')">EduMate</a> -->
+
+            <a href="#" class="logo" onclick="navigateTo('dashboard')"><span>EduMate</span></a>
+
+            <!-- <div class="nav-item" onclick="navigateTo('dashboard')">
+            <span class="nav-item-text">EduMate</span> -->
+        </div>
+            
         </div>
         <nav class="nav-links">
             <a href="#" onclick="navigateTo('faculty')">Faculty</a>
@@ -34,22 +45,30 @@
         </nav>
         <div class="controls">
             <button id="theme-toggle" class="btn-icon">🌙</button>
-            <button id="sidebar-toggle" class="btn-icon">☰</button>
+            <!-- <button id="sidebar-toggle" class="btn-icon">☰</button> -->
+            <button id="theme-toggle" class="btn-icon" onclick="signOut()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="log-out">
+            <path fill="#ff3838" fill-rule="evenodd" d="M151.059,222.739h243.925v-34.613c0-3.083,1.658-5.722,4.435-7.061,2.777-1.339,5.874-.993,8.287,.928l85.347,67.919c1.933,1.538,2.958,3.664,2.958,6.134s-1.025,4.596-2.958,6.134l-85.347,67.919c-2.412,1.92-5.51,2.267-8.287,.927-2.777-1.339-4.435-3.978-4.435-7.061v-34.613H151.059c-6.338,0-11.524-5.186-11.524-11.524v-43.564c0-6.338,5.186-11.524,11.524-11.524Z"></path>
+            <path fill="#ff3838" fill-rule="evenodd" d="M327.17,16.045H46.314c-16.667,0-30.305,13.637-30.305,30.304V465.74c0,16.667,13.637,30.304,30.305,30.304H327.17c16.667,0,30.304-13.637,30.304-30.304v-83.267c0-6.611-5.392-12.003-12.003-12.003h-42.607c-6.611,0-12.003,5.392-12.003,12.003v46.959H82.622V82.657h208.241v46.96c0,6.61,5.392,12.003,12.003,12.003h42.607c6.611,0,12.003-5.392,12.003-12.003V46.349c0-16.667-13.637-30.304-30.304-30.304Z"></path>
+            <path fill-rule="evenodd" d="M46.314,25.998c-11.202,0-20.311,9.109-20.311,20.311V465.701c0,11.188,9.109,20.296,20.311,20.296H327.163c11.197,0,20.311-9.109,20.311-20.296v-83.274c0-1.087-.924-1.997-2.011-1.997h-42.599c-1.093,0-2.002,.909-2.002,1.997v46.964c0,5.519-4.48,9.999-9.999,9.999H82.624c-5.534,0-10.004-4.48-10.004-9.999V82.609c0-5.519,4.47-9.999,10.004-9.999h208.238c5.519,0,9.999,4.48,9.999,9.999v46.959c0,1.092,.909,2.011,2.002,2.011h42.599c1.087,0,2.011-.919,2.011-2.011V46.309c0-11.202-9.114-20.311-20.311-20.311H46.314ZM327.163,506H46.314c-22.231,0-40.314-18.078-40.314-40.299V46.309C6,24.078,24.083,6,46.314,6H327.163c22.231,0,40.309,18.078,40.309,40.309v83.26c0,12.14-9.869,22.009-22.009,22.009h-42.599c-12.131,0-22-9.869-22-22.009v-36.96H92.623V419.392h188.24v-36.965c0-12.126,9.869-21.995,22-21.995h42.599c12.14,0,22.009,9.869,22.009,21.995v83.274c0,22.221-18.078,40.299-40.309,40.299h0ZM151.054,232.701h253.927v-40.141l79.703,63.44-79.703,63.439v-40.131H151.054c-.813,0-1.52-.707-1.52-1.53v-43.557c0-.813,.707-1.521,1.52-1.521h0Zm251.8,109.08c-2.632,0-5.293-.592-7.781-1.79-6.231-3.002-10.09-9.162-10.09-16.072v-24.608H151.054c-11.871,0-21.519-9.662-21.519-21.533v-43.557c0-11.871,9.648-21.523,21.519-21.523h233.929v-24.617c0-6.91,3.859-13.069,10.09-16.072,6.217-2.998,13.449-2.19,18.858,2.108l85.334,67.924c4.331,3.46,6.737,8.406,6.737,13.959s-2.406,10.509-6.737,13.959l-85.343,67.919c-3.229,2.579-7.131,3.903-11.067,3.903Z"></path>
+            </svg></button>
+
         </div>
     </header>
 
     <!-- Sidebar -->
     <nav id="sidebar" class="sidebar">
-        <div class="sidebar-profile">
-            <img id="profile-pic" class="profile-pic" src="https://via.placeholder.com/44/6C5CE7/FFFFFF?text=U">
+        <div class="sidebar-profile" onclick="navigateTo('profile')">
+            
+            <img id="profile-pic" class="profile-pic" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F036%2F885%2F313%2Foriginal%2Fblue-profile-icon-free-png.png&f=1&nofb=1&ipt=835f4c686ca5c7c40c36d1d27d110a772754ba33d4d707b84606d4cf250ecde1">
             <div>
                 <div id="profile-name" style="font-weight:700">Guest</div>
                 <div style="font-size:0.85rem;color:var(--muted)">Student</div>
-            </div>
+                
+            </div>    
         </div>
-        <div class="nav-item" onclick="navigateTo('dashboard')">
+        <!-- <div class="nav-item" onclick="navigateTo('dashboard')">
             <span>📊</span> <span class="nav-item-text">Dashboard</span>
-        </div>
+        </div> -->
         <div class="nav-item" onclick="navigateTo('faculty')">
             <span>🎓</span> <span class="nav-item-text">Faculty</span>
         </div>
@@ -62,19 +81,22 @@
         <div class="nav-item" onclick="navigateTo('jobs')">
             <span>💼</span> <span class="nav-item-text">Jobs</span>
         </div>
+        <div class="nav-item" onclick="navigateTo('scholarships')">
+            <span><img width="18" height="18" src="https://img.icons8.com/stickers/100/scholarship.png" alt="scholarship"/></span><span class="nav-item-text">Scholarships</span>
+        </div>
         <div class="nav-item" onclick="navigateTo('courses')">
             <span>📚</span> <span class="nav-item-text">Courses</span>
-        </div>
-        <div class="nav-item" onclick="navigateTo('profile')">
-            <span>👤</span> <span class="nav-item-text">Profile</span>
         </div>
         <div class="nav-item" onclick="navigateTo('xai')">
             <span>🤖</span> <span class="nav-item-text">AI Chat</span>
         </div>
-         <div class="nav-item" onclick="signOut()">
+        <!-- <div class="nav-item" onclick="navigateTo('profile')">
+            <span>👤</span> <span class="nav-item-text">Profile</span>
+        </div> -->
+         <!-- <div class="nav-item" onclick="signOut()">
                <span>🔓</span> <span class="nav-item-text">Sign out</span>
-                </div>
-            </nav>
+            </div> -->
+        </nav>
 
     <!-- Main Content -->
     <main id="mainContent" class="main-content">
@@ -393,7 +415,27 @@
             <h2>Job Recommendations</h2>
             <div id="jobs-list" class="dashboard-grid"></div>
         </section>
-        
+
+        <!-- Scholarships Page -->
+        <section id="scholarships" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Scholarships</h2>
+                <select id="scholarshipMajorSelect" class="input" style="max-width:300px" onchange="loadScholarshipsByMajor()">
+                    <option value="">Choose Your Major</option>
+                    <option value="cs">Computer Science</option>
+                    <option value="masscomm">Mass Communication</option>
+                    <option value="business">Business</option>
+                    <option value="engineering">Engineering</option>
+                    <option value="medicine">Medicine</option>
+                </select>
+            </div>
+            <div id="scholarshipsContainer" style="margin-top:20px">
+                <div class="card" style="text-align:center;color:var(--muted);padding:40px">
+                    <p>Select a major to see relevant scholarships</p>
+                </div>
+            </div>
+        </section>
+                
         <!-- Resume Page -->
         <section id="resume" class="page">
             <h2>Resume Builder</h2>
@@ -522,7 +564,8 @@
         <!-- AI Chat Page -->
         <section id="xai" class="page">
             <h2>🤖 AI Career Assistant</h2>
-            <div class="card" style="max-width:800px;margin:0 auto">
+            <br>
+            <div class="card" style="max-width:95 vw;margin:0 auto">
                 <div id="ai-chat-output" class="chat-output" style="min-height:200px;border-bottom:1px solid var(--border);padding-bottom:15px;margin-bottom:15px">
                     <div style="text-align:center;color:var(--muted);padding:20px 0">
                         <p>Ask me anything about:</p>
