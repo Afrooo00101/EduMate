@@ -208,6 +208,8 @@ function firebaseLogin(providerType) {
         provider = new firebase.auth.GoogleAuthProvider();
     } else if (providerType === 'github') {
         provider = new firebase.auth.GithubAuthProvider();
+    } else if (providerType === 'microsoft') {
+        provider = new firebase.auth.OAuthProvider('microsoft.com');
     }
 
     auth.signInWithPopup(provider)
@@ -1601,3 +1603,4 @@ window.signOut = signOut;
 window.refreshDashboard = refreshDashboard;
 window.logActivity = logActivity;
 window.initDashboard = initDashboard;
+
