@@ -14,6 +14,8 @@ const auth = firebase.auth();
 
 // Global Variables
 let users = JSON.parse(localStorage.getItem('edumate_users')) || {};
+
+// Resume Data Management
 let resumeData = {
     name: "Mohamed Ahmed",
     title: "Software Engineer",
@@ -29,10 +31,11 @@ let resumeData = {
         { title: "Frontend Developer Intern", company: "TechCorp", dates: "Summer 2024", desc: "Built responsive web apps using React and Tailwind" }
     ],
     skills: "Python, JavaScript, React, Node.js, SQL, Git, AWS",
+    summary: "Passionate software engineer with experience in web development and problem-solving. Eager to contribute to innovative projects.",
     projects: []
 };
 
-// Load resume data from localStorage
+// Load from localStorage if exists
 if (localStorage.getItem('edumate_resume')) {
     resumeData = JSON.parse(localStorage.getItem('edumate_resume'));
 }
@@ -88,8 +91,6 @@ const jobsData = [
         applyUrl: 'https://www.eand.com.eg/StaticFiles/career/#/home' 
     }
 ];
-
-
 
 // Initialize Application
 function initializeApp() {
@@ -174,7 +175,6 @@ function toggleSidebar() {
     mainContent.classList.toggle('shifted');
   }
 }
-
 
 // Authentication Functions
 function attemptLogin() {
@@ -552,171 +552,1096 @@ function renderJobs() {
     `).join('');
 }
 
-// Resume Functions
-function showResumeForm() {
-    document.getElementById('resume-form').style.display = 'block';
-    loadResumeDataIntoForm();
-}
+// Scholarships Data
+const scholarshipsData = {
+    "cs": [
+        {
+            title: "Tech Innovators Scholarship",
+            desc: "For computer science students with innovative project ideas. Deadline: Dec 15, 2024",
+            img: "https://innotechscholarship.hkfyg.org.hk/wp-content/uploads/sites/37/2022/06/KEN_0828_2.jpg"
+        },
+        {
+            title: "Women in Tech Grant",
+            desc: "Supporting female students pursuing computer science degrees",
+            img: "https://womeninstemleadership.org/wp-content/uploads/2024/11/DSC03757.jpg"
+        }
+    ],
+    "business": [
+        {
+            title: "Entrepreneurship Award",
+            desc: "For business students with startup potential",
+            img: "https://assets.entrepreneur.com/content/3x2/2000/1701945210-FSX-3209-2.jpg"
+        }
+    ],
+    "engineering": [
+        {
+            title: "Engineering Excellence Scholarship",
+            desc: "Merit-based scholarship for top engineering students",
+            img: "https://onlinedegrees.sandiego.edu/wp-content/uploads/2025/02/engineering-scholarships-768x455.jpg"
+        }
+    ],
+    "medicine": [
+        {
+            title: "Medical Research Grant",
+            desc: "Support for medical students engaged in research",
+            img: "https://avantgroup.com.au/wp-content/uploads/avant-website-image-16.jpg"
+        }
+    ]
+};
 
-function loadResumeDataIntoForm() {
-    document.getElementById('res-name').value = resumeData.name || '';
-    document.getElementById('res-title').value = resumeData.title || '';
-    document.getElementById('res-email').value = resumeData.email || '';
-    document.getElementById('res-phone').value = resumeData.phone || '';
-    document.getElementById('res-location').value = resumeData.location || '';
-    document.getElementById('res-linkedin').value = resumeData.linkedin || '';
-    document.getElementById('res-github').value = resumeData.github || '';
-    document.getElementById('res-skills').value = resumeData.skills || '';
-
-    // Populate dynamic sections
-    document.getElementById('education-container').innerHTML = '';
-    resumeData.education.forEach(addEducationEntry);
-
-    document.getElementById('experience-container').innerHTML = '';
-    resumeData.experience.forEach(addExperienceEntry);
-
-    document.getElementById('projects-container').innerHTML = '';
-    resumeData.projects.forEach(addProjectEntry);
-}
-
-function addEducation(entry = {}) {
-    const container = document.getElementById('education-container');
-    const div = document.createElement('div');
-    div.className = 'education-entry';
-    div.innerHTML = `
-        <input placeholder="Degree" class="input" value="${entry.degree || ''}" style="margin-bottom:8px">
-        <input placeholder="University" class="input" value="${entry.school || ''}" style="margin-bottom:8px">
-        <input placeholder="Year (e.g. 2022 – 2026)" class="input" value="${entry.year || ''}">
-        <button class="link-btn" style="color:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Remove</button>
-    `;
-    container.appendChild(div);
-}
-
-function addExperience(entry = {}) {
-    const container = document.getElementById('experience-container');
-    const div = document.createElement('div');
-    div.className = 'experience-entry';
-    div.innerHTML = `
-        <input placeholder="Job Title" class="input" value="${entry.title || ''}" style="margin-bottom:8px">
-        <input placeholder="Company" class="input" value="${entry.company || ''}" style="margin-bottom:8px">
-        <input placeholder="Dates" class="input" value="${entry.dates || ''}" style="margin-bottom:8px">
-        <textarea placeholder="Key achievements..." class="input" rows="3">${entry.desc || ''}</textarea>
-        <button class="link-btn" style="color:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Remove</button>
-    `;
-    container.appendChild(div);
-}
-
-function addProject(entry = {}) {
-    const container = document.getElementById('projects-container');
-    const div = document.createElement('div');
-    div.style = 'border:1px dashed var(--border);padding:12px;border-radius:8px;margin-bottom:10px';
-    div.innerHTML = `
-        <input placeholder="Project Name" class="input" value="${entry.name || ''}" style="margin-bottom:8px">
-        <input placeholder="Tech Stack" class="input" value="${entry.tech || ''}" style="margin-bottom:8px">
-        <textarea placeholder="Description" class="input" rows="2">${entry.desc || ''}</textarea>
-        <button class="link-btn" style="color:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Remove</button>
-    `;
-    container.appendChild(div);
-}
-
-function saveResumeData() {
-    // Save basic info
-    resumeData.name = document.getElementById('res-name').value.trim();
-    resumeData.title = document.getElementById('res-title').value.trim();
-    resumeData.email = document.getElementById('res-email').value.trim();
-    resumeData.phone = document.getElementById('res-phone').value.trim();
-    resumeData.location = document.getElementById('res-location').value.trim();
-    resumeData.linkedin = document.getElementById('res-linkedin').value.trim();
-    resumeData.github = document.getElementById('res-github').value.trim();
-    resumeData.skills = document.getElementById('res-skills').value.trim();
-
-    // Save dynamic entries
-    resumeData.education = Array.from(document.querySelectorAll('.education-entry')).map(el => ({
-        degree: el.children[0].value,
-        school: el.children[1].value,
-        year: el.children[2].value
-    }));
-
-    resumeData.experience = Array.from(document.querySelectorAll('.experience-entry')).map(el => ({
-        title: el.children[0].value,
-        company: el.children[1].value,
-        dates: el.children[2].value,
-        desc: el.children[3].value
-    }));
-
-    localStorage.setItem('edumate_resume', JSON.stringify(resumeData));
-    alert('Resume saved!');
-    generateResumePreview();
-}
-
-function generateResumePreview() {
-    const template = document.querySelector('input[name="template"]:checked')?.value || 'modern';
-    const content = document.getElementById('resume-content');
+// Scholarships Functions
+function loadScholarshipsByMajor() {
+    const major = document.getElementById("scholarshipMajorSelect")?.value;
+    const container = document.getElementById("scholarshipsContainer");
     
-    const templates = {
-        modern: generateModernTemplate,
-        elegant: generateElegantTemplate,
-        creative: generateCreativeTemplate
-    };
-
-    content.innerHTML = templates[template] ? templates[template]() : generateModernTemplate();
-}
-
-function generateModernTemplate() {
-    return `
-    <div style="max-width:800px;margin:0 auto;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#2d2d2d;line-height:1.5">
-        <header style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:4px solid #6C5CE7">
-            <h1 style="margin:0;font-size:2.8em;color:#6C5CE7">${resumeData.name || 'Your Name'}</h1>
-            <p style="margin:10px 0;font-size:1.2em;color:#555">${resumeData.title || 'Professional Title'}</p>
-            <p style="margin:5px 0;color:#666">
-                ${resumeData.email || 'email@example.com'} • ${resumeData.phone || '+20 123 456 7890'} • ${resumeData.location || 'City, Country'}<br>
-                ${resumeData.linkedin ? `<a href="${resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none">LinkedIn</a> • ` : ''}
-                ${resumeData.github ? `<a href="${resumeData.github}" style="color:#6C5CE7;text-decoration:none">GitHub</a>` : ''}
-            </p>
-        </header>
-
-        ${resumeData.education.length ? `<h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Education</h2>` : ''}
-        ${resumeData.education.map(e => `
-            <div style="margin-bottom:20px">
-                <strong style="font-size:1.1em">${e.degree}</strong><br>
-                <em>${e.school} • ${e.year}</em>
+    if (!container) return;
+    
+    if (!major) { 
+        container.innerHTML = `<div class="card" style="text-align:center;color:var(--muted);padding:40px"><p>Select a major to see relevant scholarships</p></div>`;
+        return; 
+    }
+    
+    const selectedScholarships = scholarshipsData[major] || [];
+    container.innerHTML = selectedScholarships.map(s => `
+        <div class="card event-card">
+            <img src="${s.img}" alt="${s.title}" onerror="this.src='https://via.placeholder.com/140x100/00B894/FFFFFF?text=SCHOLARSHIP'">
+            <div style="flex:1">
+                <h3>${s.title}</h3>
+                <p style="color:var(--muted);margin:5px 0">${s.desc}</p>
+                <button class="btn" style="font-size:0.85rem;padding:6px 12px">Apply Now</button>
             </div>
-        `).join('')}
-
-        ${resumeData.experience.length ? `<h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Experience</h2>` : ''}
-        ${resumeData.experience.map(exp => `
-            <div style="margin-bottom:20px">
-                <div style="display:flex;justify-content:space-between">
-                    <strong style="font-size:1.1em">${exp.title}</strong>
-                    <span style="color:#666">${exp.dates}</span>
-                </div>
-                <em>${exp.company}</em>
-                <ul style="margin:8px 0;padding-left:20px">
-                    <li>${exp.desc.split('\n').join('</li><li>')}</li>
-                </ul>
-            </div>
-        `).join('')}
-
-        <h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Skills</h2>
-        <p style="background:#f0f4ff;padding:12px;border-radius:8px;font-weight:500">
-            ${resumeData.skills || 'Python, JavaScript, React, SQL, Git, AWS'}
-        </p>
-    </div>`;
-}
-
-function generateElegantTemplate() {
-    return generateModernTemplate().replace(/#6C5CE7/g, '#1E293B');
-}
-
-function generateCreativeTemplate() {
-    return `
-    <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:40px;min-height:100vh">
-        <div style="background:rgba(255,255,255,0.95);color:#222;padding:40px;border-radius:16px">
-            ${generateModernTemplate().split('<header')[1] ? '<header' + generateModernTemplate().split('<header')[1] : ''}
         </div>
-    </div>`;
+    `).join("");
 }
 
+// ==================== RESUME FUNCTIONS ====================
+
+        // Global resume data object
+        let ResumeData = {
+            name: '',
+            title: '',
+            email: '',
+            phone: '',
+            location: '',
+            linkedin: '',
+            github: '',
+            skills: 'Python, JavaScript, React, SQL, Git, AWS, Leadership, Communication',
+            summary: '',
+            education: [],
+            experience: [],
+            projects: []
+        };
+
+        // Load saved data from localStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            const saved = localStorage.getItem('edumate_resume');
+            if (saved) {
+                try {
+                    resumeData = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Error loading resume data:', e);
+                }
+            }
+        });
+
+        function showResumeForm() {
+            const form = document.getElementById('resume-form');
+            if (form) form.style.display = 'block';
+            loadResumeDataIntoForm();
+        }
+
+        function loadResumeDataIntoForm() {
+            if (!resumeData) return;
+            
+            document.getElementById('res-name').value = resumeData.name || '';
+            document.getElementById('res-title').value = resumeData.title || '';
+            document.getElementById('res-email').value = resumeData.email || '';
+            document.getElementById('res-phone').value = resumeData.phone || '';
+            document.getElementById('res-location').value = resumeData.location || '';
+            document.getElementById('res-linkedin').value = resumeData.linkedin || '';
+            document.getElementById('res-github').value = resumeData.github || '';
+            document.getElementById('res-skills').value = resumeData.skills || '';
+            document.getElementById('res-summary').value = resumeData.summary || '';
+
+            // Clear containers
+            const eduContainer = document.getElementById('education-container');
+            const expContainer = document.getElementById('experience-container');
+            const projContainer = document.getElementById('projects-container');
+            
+            if (eduContainer) eduContainer.innerHTML = '';
+            if (expContainer) expContainer.innerHTML = '';
+            if (projContainer) projContainer.innerHTML = '';
+
+            // Refill dynamic fields
+            if (resumeData.education && resumeData.education.length > 0) {
+                resumeData.education.forEach(e => addEducation(e));
+            } else {
+                // Add default education entry
+                addEducation();
+            }
+            
+            if (resumeData.experience && resumeData.experience.length > 0) {
+                resumeData.experience.forEach(e => addExperience(e));
+            } else {
+                // Add default experience entry
+                addExperience();
+            }
+            
+            if (resumeData.projects && resumeData.projects.length > 0) {
+                resumeData.projects.forEach(e => addProject(e));
+            }
+        }
+
+        function addEducation(entry = {}) {
+            const container = document.getElementById('education-container');
+            if (!container) return;
+            
+            const div = document.createElement('div');
+            div.className = 'education-entry';
+            div.style = 'border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px';
+            div.innerHTML = `
+                <input placeholder="Degree" class="input" value="${entry.degree || ''}" style="margin-bottom:8px">
+                <input placeholder="University" class="input" value="${entry.school || ''}" style="margin-bottom:8px">
+                <input placeholder="Year (e.g. 2022 – 2026)" class="input" value="${entry.year || ''}">
+                <button class="link-btn" style="color:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function addExperience(entry = {}) {
+            const container = document.getElementById('experience-container');
+            if (!container) return;
+            
+            const div = document.createElement('div');
+            div.className = 'experience-entry';
+            div.style = 'border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px';
+            div.innerHTML = `
+                <input placeholder="Job Title" class="input" value="${entry.title || ''}" style="margin-bottom:8px">
+                <input placeholder="Company" class="input" value="${entry.company || ''}" style="margin-bottom:8px">
+                <input placeholder="Dates" class="input" value="${entry.dates || ''}" style="margin-bottom:8px">
+                <textarea placeholder="Key achievements..." class="input" rows="3">${entry.desc || ''}</textarea>
+                <button class="link-btn" style="color:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function addProject(entry = {}) {
+            const container = document.getElementById('projects-container');
+            if (!container) return;
+            
+            const div = document.createElement('div');
+            div.style = 'border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px';
+            div.innerHTML = `
+                <input placeholder="Project Name" class="input" value="${entry.name || ''}" style="margin-bottom:8px">
+                <input placeholder="Tech Stack" class="input" value="${entry.tech || ''}" style="margin-bottom:8px">
+                <textarea placeholder="Description" class="input" rows="2">${entry.desc || ''}</textarea>
+                <button class="link-btn" style="color:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function saveResumeData() {
+            // Save basic info
+            resumeData.name = document.getElementById('res-name').value.trim();
+            resumeData.title = document.getElementById('res-title').value.trim();
+            resumeData.email = document.getElementById('res-email').value.trim();
+            resumeData.phone = document.getElementById('res-phone').value.trim();
+            resumeData.location = document.getElementById('res-location').value.trim();
+            resumeData.linkedin = document.getElementById('res-linkedin').value.trim();
+            resumeData.github = document.getElementById('res-github').value.trim();
+            resumeData.summary = document.getElementById('res-summary').value.trim();
+            resumeData.skills = document.getElementById('res-skills').value.trim();
+
+            // Save dynamic entries
+            resumeData.education = Array.from(document.querySelectorAll('.education-entry')).map(el => ({
+                degree: el.children[0].value,
+                school: el.children[1].value,
+                year: el.children[2].value
+            }));
+
+            resumeData.experience = Array.from(document.querySelectorAll('.experience-entry')).map(el => ({
+                title: el.children[0].value,
+                company: el.children[1].value,
+                dates: el.children[2].value,
+                desc: el.children[3].value
+            }));
+            
+            resumeData.projects = Array.from(document.querySelectorAll('#projects-container > div')).map(el => ({
+                name: el.children[0].value,
+                tech: el.children[1].value,
+                desc: el.children[2].value
+            }));
+
+            localStorage.setItem('edumate_resume', JSON.stringify(resumeData));
+            alert('Resume saved!');
+            generateResumePreview();
+        }
+
+        function generateResumePreview() {
+            const template = document.querySelector('input[name="template"]:checked')?.value || 'modern';
+            const content = document.getElementById('resume-content');
+            if (!content) return;
+            
+            const templates = {
+                modern: generateModernTemplate,
+                elegant: generateElegantTemplate,
+                creative: generateCreativeTemplate,
+                classic: generateClassicTemplate,
+                compact: generateCompactTemplate,
+                harvard: generateHarvardTemplate,
+                sidebar: generateSidebarTemplate,
+                minimalHeader: generateMinimalHeaderTemplate,
+                sidebarPhoto: generateSidebarPhotoTemplate,
+                softPink: generateSoftPinkTemplate,
+                blueProfessional: generateBlueProfessionalTemplate,
+                blueModernHeader: generateBlueModernHeaderTemplate,
+                minimalElegantPhoto: generateMinimalElegantPhotoTemplate,
+                professionalTwoColumn: generateProfessionalTwoColumnTemplate,
+                cleanHeader: generateCleanHeaderTemplate,
+                academicStyle: generateAcademicStyleTemplate
+            };
+
+            content.innerHTML = templates[template] ? templates[template]() : generateModernTemplate();
+        }
+
+        function generateModernTemplate() {
+            return `
+            <div style="max-width:800px;margin:0 auto;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#2d2d2d;line-height:1.5">
+                <header style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:4px solid #6C5CE7">
+                    <h1 style="margin:0;font-size:2.8em;color:#6C5CE7">${resumeData.name || 'Your Name'}</h1>
+                    <p style="margin:10px 0;font-size:1.2em;color:#555">${resumeData.title || 'Professional Title'}</p>
+                    <p style="margin:5px 0;color:#666">
+                        ${resumeData.email || 'email@example.com'} • ${resumeData.phone || '+20 123 456 7890'} • ${resumeData.location || 'City, Country'}<br>
+                        ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
+                        ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
+                    </p>
+                </header>
+                
+                ${resumeData.summary ? `<h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Summary</h2>
+                <p style="margin-top:20px;font-size:1.1em">${resumeData.summary}</p>` : ''}
+
+                ${resumeData.education.length ? `<h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Education</h2>` : ''}
+                ${resumeData.education.map(e => `
+                    <div style="margin-bottom:20px">
+                        <strong style="font-size:1.1em">${e.degree}</strong><br>
+                        <em>${e.school} • ${e.year}</em>
+                    </div>
+                `).join('')}
+
+                ${resumeData.experience.length ? `<h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Experience</h2>` : ''}
+                ${resumeData.experience.map(exp => `
+                    <div style="margin-bottom:20px">
+                        <div style="display:flex;justify-content:space-between">
+                            <strong style="font-size:1.1em">${exp.title}</strong>
+                            <span style="color:#666">${exp.dates}</span>
+                        </div>
+                        <em>${exp.company}</em>
+                        <ul style="margin:8px 0;padding-left:20px">
+                            <li>${exp.desc.split('\n').join('</li><li>')}</li>
+                        </ul>
+                    </div>
+                `).join('')}
+
+                ${resumeData.projects.length ? `<h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Projects</h2>` : ''}
+                ${resumeData.projects.map(p => `
+                    <div style="margin-bottom:20px">
+                        <strong style="font-size:1.1em">${p.name}</strong> <span style="color:#666">(${p.tech})</span><br>
+                        <p>${p.desc}</p>
+                    </div>
+                `).join('')}
+
+                <h2 style="color:#6C5CE7;border-bottom:2px solid #6C5CE7;padding-bottom:5px">Skills</h2>
+                <p style="background:#f0f4ff;padding:12px;border-radius:8px;font-weight:500">
+                    ${resumeData.skills || 'Python, JavaScript, React, SQL, Git, AWS'}
+                </p>
+            </div>`;
+        }
+
+        function generateElegantTemplate() {
+            return generateModernTemplate().replace(/#6C5CE7/g, '#1E293B');
+        }
+
+        function generateCreativeTemplate() {
+            return `
+            <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:40px;min-height:100vh">
+                <div style="background:rgba(255,255,255,0.95);color:#222;padding:40px;border-radius:16px">
+                    ${generateModernTemplate()}
+                </div>
+            </div>`;
+        }
+
+        function generateClassicTemplate() {
+            return `
+            <div style="max-width:900px;margin:auto;font-family:Arial;line-height:1.5;color:#333">
+                <div style="display:grid;grid-template-columns:1fr 2fr;gap:25px">
+                    <div style="padding-right:15px;border-right:2px solid #ddd">
+                        <h2>${resumeData.name || 'Your Name'}</h2>
+                        <p>${resumeData.title || 'Professional Title'}</p>
+                        <hr>
+
+                        <h3>Contact</h3>
+                        <p>${resumeData.email || 'email@example.com'}<br>${resumeData.phone || '+20 123 456 7890'}<br>${resumeData.location || 'City, Country'}</p>
+                        ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
+                        ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
+
+                        <h3>Skills</h3>
+                        <ul style="padding-left:20px">${(resumeData.skills || '').split(',').map(s => `<li>${s}</li>`).join('')}</ul>
+                    </div>
+
+                    <div>
+                        ${resumeData.summary ? `<h3>Summary</h3><p>${resumeData.summary}</p>` : ''}
+                        
+                        <h3>Education</h3>
+                        ${resumeData.education.map(e => `
+                        <p>
+                            <strong>${e.degree}</strong><br>
+                            ${e.school} – ${e.year}
+                        </p>`).join('')}
+
+                        <h3>Experience</h3>
+                        ${resumeData.experience.map(exp => `
+                        <div style="margin-bottom:15px">
+                            <strong>${exp.title}</strong> — ${exp.company}<br>
+                            <small>${exp.dates}</small>
+                            <ul>${exp.desc.split('\n').map(d => `<li>${d}</li>`).join('')}</ul>
+                        </div>`).join('')}
+                        
+                        ${resumeData.projects.length ? `<h3>Projects</h3>
+                        ${resumeData.projects.map(p => `
+                        <div style="margin-bottom:15px">
+                            <strong>${p.name} (${p.tech})</strong><br>
+                            <p>${p.desc}</p>
+                        </div>`).join('')}` : ''}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateCompactTemplate() {
+            return `
+            <div style="max-width:760px;margin:auto;font-family:Arial;line-height:1.4;color:#222">
+                <h1 style="margin:0">${resumeData.name || 'Your Name'}</h1>
+                <p>${resumeData.title || 'Professional Title'}</p>
+                <p>${resumeData.email || 'email@example.com'} • ${resumeData.phone || '+20 123 456 7890'} • ${resumeData.location || 'City, Country'}<br>
+                    ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
+                    ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
+                </p>
+
+                ${resumeData.summary ? `<h3>Summary</h3><p>${resumeData.summary}</p>` : ''}
+
+                <h3>Experience</h3>
+                ${resumeData.experience.map(exp => `
+                    <p><strong>${exp.title}</strong>, ${exp.company} (${exp.dates})<br>
+                    ${exp.desc}</p>
+                `).join('')}
+
+                <h3>Education</h3>
+                ${resumeData.education.map(e => `
+                    <p><strong>${e.degree}</strong> — ${e.school} (${e.year})</p>
+                `).join('')}
+                
+                ${resumeData.projects.length ? `<h3>Projects</h3>
+                ${resumeData.projects.map(p => `
+                    <p><strong>${p.name}</strong> (${p.tech})<br>${p.desc}</p>
+                `).join('')}` : ''}
+
+                <h3>Skills</h3>
+                <p>${resumeData.skills}</p>
+            </div>`;
+        }
+
+        function generateHarvardTemplate() {
+            return `
+            <div style="font-family: Inter, sans-serif; border-left: 6px solid #a30000; padding: 25px 30px; max-width: 820px; margin: auto;">
+                <h1 style="font-size: 32px; margin-bottom: 8px; color: #a30000;">${resumeData.name || 'Your Name'}</h1>
+                <p style="color: #333; font-size: 15px;">
+                    ${resumeData.email || 'email@example.com'} | ${resumeData.phone || '+20 123 456 7890'} | ${resumeData.location || 'City, Country'}
+                </p>
+
+                ${resumeData.summary ? `<h2 style="margin-top: 28px; color: #a30000;">Summary</h2>
+                <p>${resumeData.summary}</p>` : ''}
+                
+                <h2 style="margin-top: 28px; color: #a30000;">Experience</h2>
+                ${resumeData.experience.map(exp => `
+                    <div style="margin-bottom: 20px;">
+                        <strong>${exp.title}</strong>, ${exp.company} (${exp.dates})<br>
+                        <p>${exp.desc}</p>
+                    </div>
+                `).join('')}
+
+                <h2 style="margin-top: 28px; color: #a30000;">Education</h2>
+                ${resumeData.education.map(e => `
+                    <div style="margin-bottom: 15px;">
+                        <strong>${e.degree}</strong><br>${e.school}<br>${e.year}
+                    </div>
+                `).join('')}
+                
+                ${resumeData.projects.length ? `<h2 style="margin-top: 28px; color: #a30000;">Projects</h2>
+                ${resumeData.projects.map(p => `
+                    <div style="margin-bottom: 15px;">
+                        <strong>${p.name}</strong> (${p.tech})<br>
+                        <p>${p.desc}</p>
+                    </div>
+                `).join('')}` : ''}
+
+                <h2 style="margin-top: 28px; color: #a30000;">Skills</h2>
+                <ul style="columns: 2; margin-top: 5px;">
+                    ${(resumeData.skills || '').split(",").map(s => `<li>${s.trim()}</li>`).join("")}
+                </ul>
+            </div>`;
+        }
+
+        function generateSidebarTemplate() {
+            return `
+            <div style="display:flex;max-width:1000px;margin:auto;font-family:Arial">
+                <div style="width:290px; height:100%;background:#111827;color:white;padding:25px">
+                    <h2 style="margin-top:0">${resumeData.name || 'Your Name'}</h2>
+                    <p>${resumeData.title || 'Professional Title'}</p>
+                    <hr style="border-color:#444">
+
+                    <h3>Contact</h3>
+                    <p>
+                        ${resumeData.email || 'email@example.com'}<br>
+                        ${resumeData.phone || '+20 123 456 7890'}<br>
+                        ${resumeData.location || 'City, Country'}<br><br>
+                        ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a><br>` : ''}
+                        ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
+                    </p>
+
+                    <h3>Skills</h3>
+                    <ul style="padding-left:20px">${(resumeData.skills || '').split(',').map(s => `<li>${s}</li>`).join('')}</ul>
+                </div>
+
+                <div style="padding:30px;flex:1">
+                    ${resumeData.summary ? `<h3>Summary</h3><p>${resumeData.summary}</p>` : ''}
+                    
+                    <h3>Experience</h3>
+                    ${resumeData.experience.map(exp => `
+                        <div style="margin-bottom:15px">
+                            <strong>${exp.title}</strong>, ${exp.company}<br>
+                            <small>${exp.dates}</small>
+                            <ul>${exp.desc.split('\n').map(d => `<li>${d}</li>`).join('')}</ul>
+                        </div>
+                    `).join('')}
+
+                    <h3>Education</h3>
+                    ${resumeData.education.map(e => `
+                        <p><strong>${e.degree}</strong><br>${e.school} — ${e.year}</p>
+                    `).join('')}
+
+                    ${resumeData.projects.length ? `<h3>Projects</h3>
+                    ${resumeData.projects.map(p => `
+                        <div style="margin-bottom:15px">
+                            <strong>${p.name} (${p.tech})</strong><br>
+                            <p>${p.desc}</p>
+                        </div>    
+                    `).join('')}` : ''}
+                </div>
+            </div>`;
+        }
+
+        function generateMinimalHeaderTemplate() {
+            return `
+            <div style="max-width:850px;margin:0 auto;font-family:'Georgia',serif;line-height:1.55;color:#222;">
+                <div style="background:#2f2f2f;color:white;text-align:center;padding:60px 20px 40px;
+                            clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);">
+                    <h1 style="font-size:3em;margin:0;letter-spacing:3px;">${resumeData.name || 'Your Name'}</h1>
+                    <p style="margin-top:10px;font-size:1.1em;letter-spacing:1px;">${resumeData.title || 'Professional Title'}</p>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 2fr;gap:40px;padding:40px 20px;">
+                    <div>
+                        <h3 style="font-weight:bold;margin-bottom:8px;">PERSONAL</h3>
+                        <p>
+                            ${resumeData.email || 'email@example.com'}<br>
+                            ${resumeData.phone || '+20 123 456 7890'}<br>
+                            ${resumeData.location || 'City, Country'}
+                        </p>
+
+                        <h3 style="margin-top:25px;">CONTACT</h3>
+                        <p>
+                            <strong>Email:</strong> ${resumeData.email || 'email@example.com'}<br>
+                            ${resumeData.linkedin ? `<strong>LinkedIn:</strong> <a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a><br>` : ''}
+                            ${resumeData.github ? `<strong>GitHub:</strong> <a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
+                        </p>
+
+                        <h3 style="margin-top:25px;">SKILLS</h3>
+                        <ul style="padding-left:20px;">
+                            ${(resumeData.skills || '').split(',').map(s => `<li>${s.trim()}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div>
+                        ${resumeData.summary ? `<h3>SUMMARY</h3><p>${resumeData.summary}</p>` : ''}
+                        
+                        <h3>EXPERIENCE</h3>
+                        ${resumeData.experience.map(exp => `
+                            <div style="margin-bottom:20px;">
+                                <strong>${exp.title}</strong> — ${exp.company}<br>
+                                <em>${exp.dates}</em>
+                                <p style="margin-top:8px;">${exp.desc}</p>
+                            </div>
+                        `).join('')}
+
+                        <h3 style="margin-top:30px;">EDUCATION</h3>
+                        ${resumeData.education.map(e => `
+                            <p><strong>${e.degree}</strong><br>${e.school} — ${e.year}</p>
+                        `).join('')}
+                        
+                        ${resumeData.projects.length ? `<h3 style="margin-top:30px;">PROJECTS</h3>
+                        ${resumeData.projects.map(p => `
+                            <div style="margin-bottom:15px">
+                                <strong>${p.name} (${p.tech})</strong><br>
+                                <p>${p.desc}</p>
+                            </div>    
+                        `).join('')}` : ''}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateSidebarPhotoTemplate() {
+            return `
+            <div style="max-width:1200px;margin:0 auto;font-family:Arial, sans-serif;display:grid;
+                        grid-template-columns:260px 1fr;min-height:1000px;">
+                <div style="background:#0f1c2e;color:white;padding:60px;text-align:center;">
+                    <div style="width:130px;height:130px;border-radius:50%;overflow:hidden;
+                                margin:0 auto 25px;background:#ddd;border:4px solid white;"></div>
+
+                    <h3>Contact</h3>
+                    <p>
+                        ${resumeData.location || 'City, Country'}<br>
+                        ${resumeData.phone || '+20 123 456 7890'}<br>
+                        ${resumeData.email || 'email@example.com'}
+                    </p>
+
+                    <h3 style="margin-top:25px;">Skills</h3>
+                    <ul style="text-align:left;line-height:1.6;">
+                        ${(resumeData.skills || '').split(',').map(s => `<li>${s.trim()}</li>`).join('')}
+                    </ul>
+
+                    <h3 style="margin-top:25px;">Links</h3>
+                    <p>
+                        ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:white;text-decoration:none" target="_blank">LinkedIn</a><br>` : ''}
+                        ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:white;text-decoration:none" target="_blank">GitHub</a>` : ''}
+                    </p>
+                </div>
+
+                <div style="padding:50px;">
+                    <h1 style="margin:0;font-size:2.4em;">${resumeData.name || 'Your Name'}</h1>
+                    <p style="font-size:1.2em;color:#555;">${resumeData.title || 'Professional Title'}</p>
+
+                    ${resumeData.summary ? `<h2 style="margin-top:30px;">Profile</h2><p>${resumeData.summary}</p>` : ''}
+
+                    <h2>Work Experience</h2>
+                    ${resumeData.experience.map(exp => `
+                        <div style="margin-bottom:20px;">
+                            <strong>${exp.title}</strong>, ${exp.company}
+                            <span style="float:right;color:#555">${exp.dates}</span>
+                            <p>${exp.desc}</p>
+                        </div>
+                    `).join('')}
+
+                    <h2>Education</h2>
+                    ${resumeData.education.map(e => `
+                        <p><strong>${e.degree}</strong><br>${e.school} — ${e.year}</p>
+                    `).join('')}
+                    
+                    ${resumeData.projects.length ? `<h2>Projects</h2>
+                    ${resumeData.projects.map(p => `
+                        <div style="margin-bottom:15px">
+                            <strong>${p.name} (${p.tech})</strong><br>
+                            <p>${p.desc}</p>
+                        </div>    
+                    `).join('')}` : ''}
+                </div>
+            </div>`;
+        }
+
+        function generateSoftPinkTemplate() {
+            return `
+            <div style="max-width:850px;margin:0 auto;font-family:'Inter',sans-serif;line-height:1.6;color:#222;">
+                <div style="background:#f4e6df;padding:40px;text-align:center;border-radius:8px 8px 0 0;">
+                    <h1 style="letter-spacing:2px;margin:0;font-size:2.5em;">${resumeData.name || 'Your Name'}</h1>
+                    <p style="margin-top:8px;font-size:1.1em;">${resumeData.title || 'Professional Title'}</p>
+                    <p>
+                        ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
+                        ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
+                    </p>
+                </div>
+
+                <div style="padding:40px;background:white;">
+                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:40px;">
+                        <div>
+                            <h3>CONTACT</h3>
+                            <p>
+                                ${resumeData.email || 'email@example.com'}<br>
+                                ${resumeData.phone || '+20 123 456 7890'}<br>
+                                ${resumeData.location || 'City, Country'}
+                            </p>
+
+                            <h3>EDUCATION</h3>
+                            ${resumeData.education.map(e => `
+                                <p><strong>${e.degree}</strong><br>${e.school}<br>${e.year}</p>
+                            `).join('')}
+
+                            <h3>SKILLS</h3>
+                            <ul style="padding-left:20px;">
+                                ${(resumeData.skills || '').split(',').map(s => `<li>${s.trim()}</li>`).join('')}
+                            </ul>
+                        </div>
+
+                        <div>
+                            ${resumeData.summary ? `<h3>SUMMARY</h3><p>${resumeData.summary}</p>` : ''}
+                            
+                            <h3>PROFESSIONAL EXPERIENCE</h3>
+                            ${resumeData.experience.map(exp => `
+                                <div style="margin-bottom:20px;">
+                                    <strong>${exp.title}</strong>, ${exp.company}<br>
+                                    <em>${exp.dates}</em>
+                                    <p>${exp.desc}</p>
+                                </div>
+                            `).join('')}
+                            
+                            ${resumeData.projects.length ? `<h3>PROJECTS</h3>
+                            ${resumeData.projects.map(p => `
+                                <div style="margin-bottom:20px;">
+                                    <strong>${p.name} (${p.tech})</strong><br>
+                                    <p>${p.desc}</p>
+                                </div>
+                            `).join('')}` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateBlueProfessionalTemplate() {
+            return `
+            <div style="font-family:Arial, sans-serif; color:#1e293b; line-height:1.5;">
+                <div style="background:#1d4ed8; color:white; padding:30px; text-align:center;">
+                    <h1 style="margin:0; font-size:32px;">${resumeData.name || 'Your Name'}</h1>
+                    <p style="margin:5px 0; font-size:18px;">${resumeData.title || 'Professional Title'}</p>
+                    <p style="font-size:14px;">
+                        ${resumeData.email || 'email@example.com'} | ${resumeData.phone || '+20 123 456 7890'} | ${resumeData.location || 'City, Country'}
+                    </p>
+                </div>
+                <div style="padding:30px;">
+                    ${resumeData.summary ? `<h2 style="color:#1d4ed8; border-bottom:2px solid #1d4ed8;">Summary</h2>
+                    <p style="margin-bottom:20px;">${resumeData.summary}</p>` : ''}
+                    
+                    <h2 style="color:#1d4ed8; border-bottom:2px solid #1d4ed8;">Education</h2>
+                    ${resumeData.education.map(e => `
+                        <div style="margin-bottom:10px;">
+                            <strong>${e.degree}</strong> — ${e.school} (${e.year})
+                        </div>
+                    `).join("")}
+
+                    <h2 style="color:#1d4ed8; border-bottom:2px solid #1d4ed8; margin-top:20px;">Experience</h2>
+                    ${resumeData.experience.map(exp => `
+                        <div style="margin-bottom:15px;">
+                            <strong>${exp.title}</strong>, ${exp.company} — <em>${exp.dates}</em>
+                            <p>${exp.desc}</p>
+                        </div>
+                    `).join("")}
+                    
+                    ${resumeData.projects.length > 0 ? `
+                    <h2 style="color:#1d4ed8; border-bottom:2px solid #1d4ed8; margin-top:20px;">Projects</h2>
+                    ${resumeData.projects.map(p => `
+                        <div style="margin-bottom:15px;">
+                            <strong>${p.name}</strong> (${p.tech})
+                            <p>${p.desc}</p>
+                        </div>
+                    `).join("")}
+                    ` : ""}
+
+                    <h2 style="color:#1d4ed8; border-bottom:2px solid #1d4ed8; margin-top:20px;">Skills</h2>
+                    <p>${resumeData.skills}</p>
+                </div>
+            </div>`;
+        }
+
+        function generateBlueModernHeaderTemplate() {
+            return `
+            <div style="font-family:Inter, sans-serif; line-height:1.6; color:#0f172a;">
+                <header style="background:#3b82f6; color:white; padding:40px;">
+                    <h1 style="margin:0; font-size:34px;">${resumeData.name || 'Your Name'}</h1>
+                    <p style="margin:0; font-size:18px;">${resumeData.title || 'Professional Title'}</p>
+                    <p style="margin-top:10px; font-size:14px;">
+                        ${resumeData.email || 'email@example.com'} | ${resumeData.phone || '+20 123 456 7890'} | ${resumeData.location || 'City, Country'}
+                    </p>
+                </header>
+                <section style="padding:25px;">
+                    ${resumeData.summary ? `<h2 style="color:#3b82f6;">Summary</h2>
+                    <p>${resumeData.summary}</p>` : ''}
+                    
+                    <h2 style="color:#3b82f6;">Education</h2>
+                    ${resumeData.education.map(e => `
+                        <div><strong>${e.degree}</strong> — ${e.school} (${e.year})</div>
+                    `).join("")}
+
+                    <h2 style="color:#3b82f6; margin-top:20px;">Experience</h2>
+                    ${resumeData.experience.map(exp => `
+                        <div style="margin-bottom:12px;">
+                            <strong>${exp.title}</strong>, ${exp.company}
+                            <br><em>${exp.dates}</em>
+                            <p>${exp.desc}</p>
+                        </div>
+                    `).join("")}
+                    
+                    ${resumeData.projects.length ? `
+                    <h2 style="color:#3b82f6; margin-top:20px;">Projects</h2>
+                    ${resumeData.projects.map(p => `
+                        <div>
+                            <strong>${p.name}</strong> (${p.tech})
+                            <p>${p.desc}</p>
+                        </div>
+                    `).join("")}
+                    ` : ""}
+
+                    <h2 style="color:#3b82f6; margin-top:20px;">Skills</h2>
+                    <p>${resumeData.skills}</p>
+                </section>
+            </div>`;
+        }
+
+        function generateMinimalElegantPhotoTemplate() {
+            return `
+            <div style="display:flex; font-family:Georgia, serif; color:#1e293b;">
+                <aside style="width:30%; height:100%; background:#f8fafc; padding:55px; text-align:center; border-right:1px solid #e2e8f0;">
+                    <div style="width:130px;height:130px;border-radius:50%;overflow:hidden;
+                                margin:0 auto 25px;background:#ddd;border:4px solid white;"></div>
+                    <h2 style="font-size:22px;">${resumeData.name || 'Your Name'}</h2>
+                    <p>${resumeData.title || 'Professional Title'}</p>
+                    <hr style="margin:15px 0">
+                    <p style="font-size:14px;">${resumeData.email || 'email@example.com'}</p>
+                    <p style="font-size:14px;">${resumeData.phone || '+20 123 456 7890'}</p>
+                    <p style="font-size:14px;">${resumeData.location || 'City, Country'}</p>
+                    <br>
+                    ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a><br>` : ''}
+                    ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
+                    <br><br>
+                    
+                    <h3 style="text-align:left; border-bottom:2px solid #e2e8f0; padding-bottom:5px;">Skills</h3>
+                    <ul style="text-align:left; padding-left:20px;">
+                        ${(resumeData.skills || '').split(',').map(s => `<li>${s.trim()}</li>`).join('')}
+                    </ul>
+                </aside>
+
+                <main style="width:70%; padding:30px;">
+                    ${resumeData.summary ? `<h2 style="border-bottom:2px solid #e2e8f0;">Summary</h2>
+                    <p style="margin-bottom:20px;">${resumeData.summary}</p>` : ''}
+                    
+                    <h2 style="border-bottom:2px solid #e2e8f0;">Education</h2>
+                    ${resumeData.education.map(e => `
+                        <div style="margin-bottom:10px;">
+                            <strong>${e.degree}</strong> — ${e.school} (${e.year})
+                        </div>
+                    `).join("")}
+
+                    <h2 style="margin-top:20px; border-bottom:2px solid #e2e8f0;">Experience</h2>
+                    ${resumeData.experience.map(exp => `
+                        <div style="margin-bottom:12px;">
+                            <strong>${exp.title}</strong>, ${exp.company}
+                            <br><em>${exp.dates}</em>
+                            <p>${exp.desc}</p>
+                        </div>
+                    `).join("")}
+                    
+                    ${resumeData.projects.length ? `
+                    <h2 style="margin-top:20px; border-bottom:2px solid #e2e8f0;">Projects</h2>
+                    ${resumeData.projects.map(p => `
+                        <div>
+                            <strong>${p.name}</strong> (${p.tech})
+                            <p>${p.desc}</p>
+                        </div>
+                    `).join("")}
+                    ` : ""}
+                </main>
+            </div>`;
+        }
+
+        function generateProfessionalTwoColumnTemplate() {
+            return `
+            <div style="max-width:1000px;margin:0 auto;font-family:'Arial',sans-serif;display:grid;grid-template-columns:30% 70%;min-height:1100px;">
+                <!-- LEFT SIDEBAR -->
+                <div style="background:#2c3e50;color:white;padding:40px 30px;">
+                    <h1 style="margin:0 0 10px;font-size:28px;color:#ecf0f1">${resumeData.name || 'Your Name'}</h1>
+                    <p style="margin:0 0 30px;font-size:16px;color:#bdc3c7">${resumeData.title || 'Professional Title'}</p>
+                    
+                    <div style="margin-bottom:30px;">
+                        <h2 style="font-size:18px;color:#ecf0f1;border-bottom:2px solid #7f8c8d;padding-bottom:5px;margin-bottom:15px;">PROFESSIONAL SUMMARY</h2>
+                        <p style="font-size:14px;line-height:1.5">${resumeData.summary || 'Add your professional summary here...'}</p>
+                    </div>
+                    
+                    <div style="margin-bottom:30px;">
+                        <h2 style="font-size:18px;color:#ecf0f1;border-bottom:2px solid #7f8c8d;padding-bottom:5px;margin-bottom:15px;">CONTACT</h2>
+                        <p style="font-size:14px;">
+                            ${resumeData.email || 'email@example.com'}<br>
+                            ${resumeData.phone || '(123) 456-7890'}<br>
+                            ${resumeData.location || 'City, State'}<br>
+                            ${resumeData.linkedin ? `<br><a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#bdc3c7;text-decoration:none" target="_blank">LinkedIn Profile</a>` : ''}
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom:30px;">
+                        <h2 style="font-size:18px;color:#ecf0f1;border-bottom:2px solid #7f8c8d;padding-bottom:5px;margin-bottom:15px;">SKILLS</h2>
+                        <div style="font-size:14px;">
+                            ${(resumeData.skills || '').split(',').map(skill => `
+                                <div style="margin-bottom:8px">• ${skill.trim()}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom:30px;">
+                        <h2 style="font-size:18px;color:#ecf0f1;border-bottom:2px solid #7f8c8d;padding-bottom:5px;margin-bottom:15px;">EDUCATION</h2>
+                        ${resumeData.education.length > 0 ? resumeData.education.map(edu => `
+                            <div style="margin-bottom:20px;">
+                                <strong style="font-size:14px;">${edu.degree || 'Degree'}</strong><br>
+                                <span style="font-size:13px;">${edu.school || 'Institution'}</span><br>
+                                <em style="font-size:13px;">${edu.year || 'Year'}</em>
+                            </div>
+                        `).join('') : '<p style="font-size:14px;">Add your education details...</p>'}
+                    </div>
+                    
+                    <div>
+                        <h2 style="font-size:18px;color:#ecf0f1;border-bottom:2px solid #7f8c8d;padding-bottom:5px;margin-bottom:15px;">AFFILIATIONS</h2>
+                        <div style="font-size:14px;">
+                            <div style="margin-bottom:8px">• American Society of Professionals</div>
+                            <div style="margin-bottom:8px">• Association of Information Technology Professionals</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- RIGHT MAIN CONTENT -->
+                <div style="padding:40px 30px;background:#ffffff;">
+                    <h2 style="color:#2c3e50;border-bottom:2px solid #2c3e50;padding-bottom:5px;margin-bottom:25px;">WORK HISTORY</h2>
+                    
+                    ${resumeData.experience.length > 0 ? resumeData.experience.map(exp => `
+                        <div style="margin-bottom:30px;">
+                            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+                                <strong style="font-size:16px;color:#2c3e50;">${exp.title || 'Job Title'}</strong>
+                                <span style="font-size:14px;color:#7f8c8d;">${exp.dates || 'Dates'}</span>
+                            </div>
+                            <div style="font-size:14px;color:#34495e;margin-bottom:10px;">
+                                ${exp.company || 'Company'} • ${exp.company ? (exp.location || resumeData.location || 'Location') : ''}
+                            </div>
+                            <ul style="padding-left:20px;margin:0;font-size:14px;line-height:1.5;color:#2c3e50;">
+                                ${exp.desc ? exp.desc.split('\n').map(item => `<li style="margin-bottom:5px;">${item}</li>`).join('') : '<li>Add your responsibilities and achievements...</li>'}
+                            </ul>
+                        </div>
+                    `).join('') : `
+                        <div style="margin-bottom:30px;">
+                            <p style="font-size:14px;color:#7f8c8d;font-style:italic;">Add your work experience in the form above...</p>
+                        </div>
+                    `}
+                    
+                    ${resumeData.projects.length > 0 ? `
+                        <h2 style="color:#2c3e50;border-bottom:2px solid #2c3e50;padding-bottom:5px;margin-bottom:25px;margin-top:40px;">PROJECTS</h2>
+                        ${resumeData.projects.map(proj => `
+                            <div style="margin-bottom:20px;">
+                                <strong style="font-size:16px;color:#2c3e50;">${proj.name || 'Project Name'}</strong>
+                                <span style="font-size:14px;color:#7f8c8d;"> (${proj.tech || 'Technologies'})</span>
+                                <p style="font-size:14px;margin-top:5px;line-height:1.5;">${proj.desc || 'Project description'}</p>
+                            </div>
+                        `).join('')}
+                    ` : ''}
+                </div>
+            </div>`;
+        }
+
+        function generateCleanHeaderTemplate() {
+            return `
+            <div style="max-width:800px;margin:0 auto;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;line-height:1.5;">
+                <!-- HEADER -->
+                <header style="text-align:center;padding:30px 0 20px;margin-bottom:30px;">
+                    <h1 style="font-size:36px;margin:0;color:#2c3e50;font-weight:bold;">${resumeData.name || 'Your Name'}</h1>
+                    <p style="font-size:18px;margin:10px 0;color:#7f8c8d;">${resumeData.title || 'Professional Title'}</p>
+                    
+                    <div style="margin-top:15px;font-size:14px;color:#555;">
+                        <span>${resumeData.phone || '(123) 456-7890'}</span> • 
+                        <span>${resumeData.email || 'email@example.com'}</span> • 
+                        ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#3498db;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
+                        ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#3498db;text-decoration:none" target="_blank">Portfolio</a>` : ''}<br>
+                        <span>${resumeData.location || 'City, State'}</span>
+                    </div>
+                </header>
+                
+                <div style="padding:0 20px;">
+                    <!-- SUMMARY -->
+                    ${resumeData.summary ? `
+                        <div style="margin-bottom:30px;">
+                            <p style="font-size:16px;line-height:1.6;">${resumeData.summary}</p>
+                        </div>
+                    ` : ''}
+                    
+                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:40px;">
+                        <!-- LEFT COLUMN -->
+                        <div>
+                            <!-- EDUCATION -->
+                            <h3 style="color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:5px;margin-bottom:15px;">EDUCATION</h3>
+                            ${resumeData.education.length > 0 ? resumeData.education.map(edu => `
+                                <div style="margin-bottom:20px;">
+                                    <strong style="font-size:15px;">${edu.degree || 'Degree Name'}</strong><br>
+                                    <span style="font-size:14px;">${edu.school || 'Institution Name'}</span><br>
+                                    <em style="font-size:13px;color:#7f8c8d;">${edu.year || 'Graduation Year'}</em>
+                                </div>
+                            `).join('') : '<p style="font-size:14px;color:#7f8c8d;">Add your education details...</p>'}
+                            
+                            <!-- SKILLS -->
+                            <h3 style="color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:5px;margin-bottom:15px;margin-top:30px;">KEY SKILLS</h3>
+                            <div style="font-size:14px;">
+                                ${(resumeData.skills || '').split(',').map(skill => `
+                                    <div style="margin-bottom:5px">• ${skill.trim()}</div>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- CERTIFICATIONS -->
+                            ${resumeData.projects.length > 0 ? `
+                                <h3 style="color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:5px;margin-bottom:15px;margin-top:30px;">CERTIFICATION</h3>
+                                ${resumeData.projects.map((proj, index) => `
+                                    <div style="font-size:14px;margin-bottom:8px;">• ${proj.name || 'Certification Name'} (${proj.tech || 'Issuing Body'})</div>
+                                `).join('')}
+                            ` : ''}
+                        </div>
+                        
+                        <!-- RIGHT COLUMN -->
+                        <div>
+                            <!-- EXPERIENCE -->
+                            <h3 style="color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:5px;margin-bottom:15px;">PROFESSIONAL EXPERIENCE</h3>
+                            
+                            ${resumeData.experience.length > 0 ? resumeData.experience.map((exp, index) => `
+                                <div style="margin-bottom:${index < resumeData.experience.length - 1 ? '30px' : '0'};">
+                                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:5px;">
+                                        <strong style="font-size:16px;">${exp.title || 'Job Title'}</strong>
+                                        <span style="font-size:14px;color:#7f8c8d;">${exp.dates || 'Date Range'}</span>
+                                    </div>
+                                    <div style="font-size:15px;color:#34495e;margin-bottom:10px;font-style:italic;">
+                                        ${exp.company || 'Company Name'}, ${exp.location || resumeData.location || 'Location'}
+                                    </div>
+                                    <ul style="padding-left:20px;margin:0;font-size:14px;line-height:1.5;">
+                                        ${exp.desc ? exp.desc.split('\n').map(item => `<li style="margin-bottom:8px;">${item}</li>`).join('') : '<li>Add your achievements...</li>'}
+                                    </ul>
+                                </div>
+                            `).join('') : `
+                                <div style="margin-bottom:30px;">
+                                    <p style="font-size:14px;color:#7f8c8d;font-style:italic;">Add your professional experience in the form above...</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateAcademicStyleTemplate() {
+            return `
+            <div style="max-width:900px;margin:0 auto;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#2c3e50;line-height:1.6;">
+                <!-- HEADER -->
+                <header style="text-align:center;padding-bottom:20px;border-bottom:2px solid #ecf0f1;margin-bottom:30px;">
+                    <h1 style="font-size:32px;margin:0 0 5px;font-weight:bold;letter-spacing:1px;">${resumeData.name || 'Your Name'}</h1>
+                    <p style="font-size:16px;margin:0 0 15px;color:#7f8c8d;text-transform:uppercase;">${resumeData.title || 'PROFESSIONAL TITLE'}</p>
+                    
+                    <div style="display:flex;justify-content:center;align-items:center;gap:15px;font-size:14px;color:#555;">
+                        <span>${resumeData.phone || '(123) 456-7890'}</span> • 
+                        <span>${resumeData.email || 'email@example.com'}</span> • 
+                        <span>${resumeData.location || 'City, State'}</span><br>
+                    </div>
+                    <div style="margin-top:8px;font-size:13px;">
+                        ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#3498db;text-decoration:none" target="_blank">LinkedIn Profile</a>` : ''}
+                    </div>
+                </header>
+                
+                <div style="display:grid;grid-template-columns:35% 65%;gap:30px;padding:0 10px;">
+                    <!-- LEFT COLUMN -->
+                    <div>
+                        <!-- EDUCATION -->
+                        <h3 style="color:#2c3e50;font-size:16px;border-bottom:1px solid #bdc3c7;padding-bottom:3px;margin-bottom:15px;">EDUCATION</h3>
+                        ${resumeData.education.length > 0 ? resumeData.education.map(edu => `
+                            <div style="margin-bottom:25px;">
+                                <div style="font-weight:bold;font-size:14px;">${edu.degree || 'DEGREE'}</div>
+                                <div style="font-size:13px;color:#7f8c8d;margin:3px 0;">${edu.year || 'Year'}</div>
+                                <div style="font-size:14px;">${edu.school || 'Institution'}</div>
+                                <div style="font-size:13px;color:#7f8c8d;">${edu.location || resumeData.location || 'Location'}</div>
+                            </div>
+                        `).join('') : `
+                            <div style="margin-bottom:25px;">
+                                <p style="font-size:14px;color:#7f8c8d;font-style:italic;">Add your education details...</p>
+                            </div>
+                        `}
+                        
+                        <!-- SKILLS -->
+                        <h3 style="color:#2c3e50;font-size:16px;border-bottom:1px solid #bdc3c7;padding-bottom:3px;margin-bottom:15px;margin-top:30px;">SKILLS</h3>
+                        <div style="font-size:14px;line-height:1.8;">
+                            ${(resumeData.skills || '').split(',').slice(0, 12).map(skill => `
+                                <div>• ${skill.trim()}</div>
+                            `).join('')}
+                        </div>
+                        
+                        <!-- AWARDS -->
+                        ${resumeData.projects.length > 0 ? `
+                            <h3 style="color:#2c3e50;font-size:16px;border-bottom:1px solid #bdc3c8;padding-bottom:3px;margin-bottom:15px;margin-top:30px;">AWARDS</h3>
+                            ${resumeData.projects.slice(0, 2).map((proj, index) => `
+                                <div style="margin-bottom:20px;">
+                                    <div style="font-size:13px;color:#7f8c8d;">${proj.tech || 'Date'}</div>
+                                    <div style="font-weight:bold;font-size:14px;">${proj.name || 'Award Name'}</div>
+                                    <div style="font-size:13px;">${proj.desc || 'Organization'} | Location</div>
+                                </div>
+                            `).join('')}
+                        ` : ''}
+                    </div>
+                    
+                    <!-- RIGHT COLUMN -->
+                    <div>
+                        <!-- CAREER OBJECTIVE -->
+                        <h3 style="color:#2c3e50;font-size:16px;border-bottom:1px solid #bdc3c7;padding-bottom:3px;margin-bottom:15px;">CAREER OBJECTIVE</h3>
+                        <div style="font-size:14px;margin-bottom:30px;line-height:1.6;">
+                            ${resumeData.summary || 'Add your career objective or professional summary here...'}
+                        </div>
+                        
+                        <!-- EXPERIENCE -->
+                        <h3 style="color:#2c3e50;font-size:16px;border-bottom:1px solid #bdc3c7;padding-bottom:3px;margin-bottom:15px;">EXPERIENCE</h3>
+                        
+                        ${resumeData.experience.length > 0 ? resumeData.experience.map(exp => `
+                            <div style="margin-bottom:30px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                    <strong style="font-size:15px;">${exp.title || 'Position Title'}</strong>
+                                    <span style="font-size:13px;color:#7f8c8d;">${exp.dates || 'Date Range'}</span>
+                                </div>
+                                <ul style="padding-left:20px;margin:0;font-size:14px;line-height:1.6;">
+                                    ${exp.desc ? exp.desc.split('\n').map(item => `
+                                        <li style="margin-bottom:8px;">${item}</li>
+                                    `).join('') : '<li>Add your responsibilities and achievements...</li>'}
+                                </ul>
+                            </div>
+                        `).join('') : `
+                            <div style="margin-bottom:30px;">
+                                <p style="font-size:14px;color:#7f8c8d;font-style:italic;">Add your experience in the form above...</p>
+                            </div>
+                        `}
+                        
+                        <!-- PROJECTS -->
+                        ${resumeData.projects.length > 0 ? `
+                            <h3 style="color:#2c3e50;font-size:16px;border-bottom:1px solid #bdc3c7;padding-bottom:3px;margin-bottom:15px;">PROJECTS</h3>
+                            
+                            ${resumeData.projects.map(proj => `
+                                <div style="margin-bottom:25px;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                        <strong style="font-size:15px;">${proj.name || 'Project Name'}</strong>
+                                        <span style="font-size:13px;color:#7f8c8d;">${proj.tech || 'Date Range'}</span>
+                                    </div>
+                                    <ul style="padding-left:20px;margin:0;font-size:14px;line-height:1.6;">
+                                        <li style="margin-bottom:5px;">${proj.desc || 'Project description...'}</li>
+                                    </ul>
+                                </div>
+                            `).join('')}
+                        ` : ''}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+// Download resume as PDF 
 function downloadResumePDF() {
     const element = document.getElementById('resume-content');
     if (!element) {
@@ -758,6 +1683,49 @@ function checkATSCompatibility() {
     feedback.style.display = 'block';
 }
 
+
+    // Download resume as PDF 
+    function downloadResumePDF() {
+        const element = document.getElementById('resume-content');
+        if (!element) {
+            alert('Please generate a resume preview first.');
+            return;
+        }
+        
+        html2pdf()
+            .set({ 
+                margin: 10, 
+                filename: `${resumeData.name || 'Resume'}_Edumate.pdf`, 
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            })
+            .from(element)
+            .save()
+            .catch(err => {
+                console.error('PDF generation error:', err);
+                alert('Error generating PDF. Please try again.');
+            });
+    }
+
+    function checkATSCompatibility() {
+        const feedback = document.getElementById('ats-feedback');
+        if (!feedback) return;
+        
+        feedback.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <strong style="color:#10B981">ATS Score: 85% ✅</strong><br>
+                    <span style="color:var(--muted);font-size:0.9rem">Good job! Your resume passes most systems.</span>
+                </div>
+                <div style="text-align:right">
+                    <strong style="color:#F59E0B">⚠️ Missing Keywords:</strong><br>
+                    <span style="font-size:0.85rem">• Agile Methodology<br>• React.js<br>• AWS Cloud</span>
+                </div>
+            </div>
+        `;
+        feedback.style.display = 'block';
+    }
+
 function calculateProfileCompletion() {
     const uname = sessionStorage.getItem('edumate_username');
     if (!uname || !users[uname]) return 0;
@@ -785,7 +1753,6 @@ function updateProfileCompletion() {
         percentageText.textContent = `${percentage}%`;
     }
 }
-
 
 // Dashboard Functions
 function initDashboard() {
@@ -831,7 +1798,6 @@ function calculateCareerScore() {
     if (user.profilePic && !user.profilePic.includes('placeholder')) score += 5;
     
     if (localStorage.getItem('edumate_resume')) score += 10;
-    if (sessionStorage.getItem('edumate_ai_chats')) score += 5;
     
     return Math.min(score, 100);
 }
@@ -900,10 +1866,9 @@ function loadRecentActivity() {
   `).join('');
 }
 
-
 function startDashboardAnimations() {
     // Animate numbers
-    const counters = document.querySelectorAll('#career-score, #skill-growth, #profile-views, #learning-time');
+    const counters = document.querySelectorAll('#career-score, #skill-growth, #learning-time');
     
     counters.forEach(counter => {
         const target = parseInt(counter.textContent);
@@ -916,7 +1881,7 @@ function startDashboardAnimations() {
                 clearInterval(timer);
             }
             
-            if (counter.id === 'career-score' || counter.id === 'profile-views') {
+            if (counter.id === 'career-score' || counter.id === 'learning-time') {
                 counter.textContent = Math.floor(current);
             } else if (counter.id === 'skill-growth') {
                 counter.textContent = `+${Math.floor(current)}%`;
@@ -926,30 +1891,21 @@ function startDashboardAnimations() {
 }
 
 function refreshDashboard() {
-    
     const refreshBtn = document.querySelector('[onclick="refreshDashboard()"]');
     if (refreshBtn) {
         refreshBtn.innerHTML = '⏳';
         refreshBtn.disabled = true;
     }
     
-    
     loadDashboardStats();
     
-    
     setTimeout(() => {
-       
         if (refreshBtn) {
             refreshBtn.innerHTML = '🔄';
             refreshBtn.disabled = false;
         }
         
-        
-        if (window.notifications) {
-            notifications.show('Dashboard refreshed successfully!', 'success');
-        } else {
-            alert('Dashboard refreshed!');
-        }
+        alert('Dashboard refreshed!');
     }, 1000);
 }
 
@@ -1068,7 +2024,7 @@ function renderMyCourses() {
                 <div style="font-size: 3rem; margin-bottom: 20px;">📚</div>
                 <h3>No Enrolled Courses</h3>
                 <p style="color: var(--muted); margin-bottom: 20px;">Start your learning journey by enrolling in a course</p>
-                <button class="btn" onclick="showRecommendedCourses()">Browse Courses</button>
+                <button class="btn" onclick="renderRecommendedCourses()">Browse Courses</button>
             </div>
         `;
         return;
@@ -1458,10 +2414,6 @@ function closeCourseModal() {
     modals.forEach(modal => modal.remove());
 }
 
-
-
-
-
 const PROTECTED_PAGES = new Set(['dashboard','faculty','events','resume','jobs','xai','profile','courses']);
 
 function navigateTo(id) {
@@ -1524,7 +2476,16 @@ function runPageInit(id) {
     setTimeout(loadEventsByMajor, 50);
   }
   if (id === 'resume') {
-    setTimeout(generateResumePreview, 50);
+    setTimeout(() => {
+        generateResumePreview();
+        loadResumeDataIntoForm();
+    }, 50);
+  }
+  if (id === 'jobs') {
+    setTimeout(renderJobs, 50);
+  }
+  if (id === 'scholarships') {
+    setTimeout(loadScholarshipsByMajor, 50);
   }
   if (id === 'courses') {
     setTimeout(initCoursesPage, 50);
@@ -1546,8 +2507,6 @@ function logActivity(action, text) {
   localStorage.setItem('edumate_activity', JSON.stringify(arr.slice(0, 20)));
 }
 
-
-
 document.addEventListener('DOMContentLoaded', () => {
   // 1) Theme
   const storedTheme = localStorage.getItem('edumate_theme');
@@ -1566,11 +2525,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeApp();
 });
 
-
 // Export functions to global scope for onclick attributes
-
 window.navigateTo = navigateTo;
-window.initCourses = initCourses;
 window.initCoursesPage = initCoursesPage;
 window.renderMyCourses = renderMyCourses;
 window.renderRecommendedCourses = renderRecommendedCourses;
@@ -1591,6 +2547,7 @@ window.toggleAIPopup = toggleAIPopup;
 window.sendAIChatMessage = sendAIChatMessage;
 window.sendAIPopupMessage = sendAIPopupMessage;
 window.loadEventsByMajor = loadEventsByMajor;
+window.loadScholarshipsByMajor = loadScholarshipsByMajor;
 window.showResumeForm = showResumeForm;
 window.addEducation = addEducation;
 window.addExperience = addExperience;
@@ -1603,4 +2560,3 @@ window.signOut = signOut;
 window.refreshDashboard = refreshDashboard;
 window.logActivity = logActivity;
 window.initDashboard = initDashboard;
-

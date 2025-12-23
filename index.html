@@ -62,6 +62,9 @@
         <div class="nav-item" onclick="navigateTo('jobs')">
             <span>💼</span> <span class="nav-item-text">Jobs</span>
         </div>
+        <div class="nav-item" onclick="navigateTo('scholarships')">
+            <span><img width="18" height="18" src="https://img.icons8.com/stickers/100/scholarship.png" alt="scholarship"/></span><span class="nav-item-text">Scholarships</span>
+        </div>
         <div class="nav-item" onclick="navigateTo('courses')">
             <span>📚</span> <span class="nav-item-text">Courses</span>
         </div>
@@ -393,9 +396,29 @@
             <h2>Job Recommendations</h2>
             <div id="jobs-list" class="dashboard-grid"></div>
         </section>
-        
-        <!-- Resume Page -->
+
+        <!-- Scholarships Page -->
+        <section id="scholarships" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Scholarships</h2>
+                <select id="scholarshipMajorSelect" class="input" style="max-width:300px" onchange="loadScholarshipsByMajor()">
+                    <option value="">Choose Your Major</option>
+                    <option value="cs">Computer Science</option>
+                    <option value="masscomm">Mass Communication</option>
+                    <option value="business">Business</option>
+                    <option value="engineering">Engineering</option>
+                    <option value="medicine">Medicine</option>
+                </select>
+            </div>
+            <div id="scholarshipsContainer" style="margin-top:20px">
+                <div class="card" style="text-align:center;color:var(--muted);padding:40px">
+                    <p>Select a major to see relevant scholarships</p>
+                </div>
+            </div>
+        </section>
+                
         <section id="resume" class="page">
+   
             <h2>Resume Builder</h2>
             
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
@@ -403,7 +426,7 @@
                 <button class="btn" onclick="generateResumePreview()">Preview Resume</button>
             </div>
 
-            <!-- Resume template -->
+            <!-- Resume template-->
             <div class="card" style="margin-bottom:20px">
                 <h3>Choose Template</h3>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
@@ -417,7 +440,7 @@
                     <label style="cursor:pointer">
                         <input type="radio" name="template" value="elegant" onchange="generateResumePreview()">
                         <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
-                            <div style="background:#2b3a53;color:#E2E8F0;padding:20px;border-radius:8px;margin-bottom:8px">Elegant</div>
+                            <div style="background:#1E293B;color:#E2E8F0;padding:20px;border-radius:8px;margin-bottom:8px">Elegant</div>
                             <small>Professional & minimal</small>
                         </div>
                     </label>
@@ -428,15 +451,132 @@
                             <small>Bold & eye-catching</small>
                         </div>
                     </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="classic" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#334155;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Classic</div>
+                            <small>Two-column professional layout</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="compact" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#0f172a;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Compact</div>
+                            <small>Slim, space-efficient</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="harvard" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#475569;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Harvard</div>
+                            <small>Clean left bar layout</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="sidebar" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#111827;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Sidebar</div>
+                            <small>Bold left sidebar look</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="minimalHeader" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#475569;color:white;padding:20px;border-radius:8px;margin-bottom:8px">minimalHeader</div>
+                            <small>Clean left bar layout</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="sidebarPhoto" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#111827;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Sidebar Photo</div>
+                            <small>Bold left sidebar look with photo</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="softPink" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#475569;color:white;padding:20px;border-radius:8px;margin-bottom:8px">softPink</div>
+                            <small>Pink-themed soft design</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="blueProfessional" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#1e3a8a;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Blue Professional
+                            </div>
+                            <small>Strong corporate look</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="blueModernHeader" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#0f172a;color:#93c5fd;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Blue Modern Header
+                            </div>
+                            <small>Sleek dark header</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="minimalElegantPhoto" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#f1f5f9;color:#1e293b;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Minimal Elegant
+                            </div>
+                            <small>Clean layout + circle header</small>
+                        </div>
+                    </label>
+                    
+                    <!-- NEW TEMPLATES BASED ON IMAGES -->
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="professionalTwoColumn" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#2c3e50;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Professional Two-Column
+                            </div>
+                            <small>Like JAMES STELE resume</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="cleanHeader" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#34495e;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Clean Header
+                            </div>
+                            <small>Simple professional layout</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="academicStyle" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#2d3436;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Academic Style
+                            </div>
+                            <small>University/entry-level format</small>
+                        </div>
+                    </label>
                 </div>
             </div>
 
-            <!-- Resume Form -->
-            <div id="resume-form" class="card" style="display:block">
-                <h3 style="margin-top:0">Edit Your Resume</h3>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:20px">
+            <!-- Resume Form  -->
+            <div id="resume-form" class="card">
+                <h3>Edit Your Resume</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
                     <input id="res-name" class="input" placeholder="Full Name">
-                    <input id="res-title" class="input" placeholder="Professional Title">
+                    <input id="res-title" class="input" placeholder="Professional Title (e.g. Software Engineer)">
                     <input id="res-email" class="input" placeholder="Email">
                     <input id="res-phone" class="input" placeholder="Phone">
                     <input id="res-location" class="input" placeholder="City, Country">
@@ -446,7 +586,7 @@
                 
                 <h4 style="margin:20px 0 10px">Education</h4>
                 <div id="education-container">
-                    <div class="education-entry" style="border:1px dashed var(--border);padding:12px;border-radius:8px;margin-bottom:10px">
+                    <div class="education-entry" style="border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px">
                         <input placeholder="Degree (e.g. B.Sc Computer Science)" class="input" style="margin-bottom:8px">
                         <input placeholder="University" class="input" style="margin-bottom:8px">
                         <input placeholder="Graduation Year (e.g. 2025)" class="input">
@@ -456,7 +596,7 @@
 
                 <h4 style="margin:20px 0 10px">Experience</h4>
                 <div id="experience-container">
-                    <div class="experience-entry" style="border:1px dashed var(--border);padding:12px;border-radius:8px;margin-bottom:10px">
+                    <div class="experience-entry" style="border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px">
                         <input placeholder="Job Title" class="input" style="margin-bottom:8px">
                         <input placeholder="Company" class="input" style="margin-bottom:8px">
                         <input placeholder="Dates (e.g. Jan 2023 – Present)" class="input" style="margin-bottom:8px">
@@ -467,19 +607,22 @@
 
                 <h4 style="margin:20px 0 10px">Skills</h4>
                 <input id="res-skills" class="input" placeholder="e.g. Python, React, AWS, Leadership">
+                
+                <h4 style="margin:20px 0 10px">Summary</h4>
+                <textarea id="res-summary" class="input" placeholder="Professional summary or objective"></textarea>
 
                 <h4 style="margin:20px 0 10px">Projects (Optional)</h4>
                 <div id="projects-container"></div>
                 <button class="link-btn" onclick="addProject()">+ Add Project</button>
 
-                <button class="btn" style="margin-top:20px;width:100%" onclick="saveResumeData()">Save & Preview</button>
+                <button class="btn" style="margin-top:20px" onclick="saveResumeData()">Save & Preview</button>
             </div>
 
             <!-- Resume Preview -->
             <div id="resume-preview" class="card" style="margin-top:20px;overflow:hidden">
-                <div style="text-align:center;padding:15px;background:#f1f5f9">
+                <div style="text-align:center;padding:10px;background:#f1f5f9">
                     <button class="btn" onclick="downloadResumePDF()">Download PDF</button>
-                    <button class="link-btn" onclick="checkATSCompatibility()" style="margin-left:10px">Check ATS Score</button>
+                    <button class="link-btn" onclick="checkATSCompatibility()">Check ATS Score</button>
                 </div>
                 <div id="resume-content" style="padding:40px;background:white;min-height:800px;font-family:Arial,sans-serif">
                     <!-- Resume will be injected here -->
@@ -522,7 +665,8 @@
         <!-- AI Chat Page -->
         <section id="xai" class="page">
             <h2>🤖 AI Career Assistant</h2>
-            <div class="card" style="max-width:800px;margin:0 auto">
+            <br>
+            <div class="card" style="max-width:95 vw;margin:0 auto">
                 <div id="ai-chat-output" class="chat-output" style="min-height:200px;border-bottom:1px solid var(--border);padding-bottom:15px;margin-bottom:15px">
                     <div style="text-align:center;color:var(--muted);padding:20px 0">
                         <p>Ask me anything about:</p>
