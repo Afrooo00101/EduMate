@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Edumate — Empower Your Future</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- html2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <img src="Edumate.logo-removebg-preview (1).png" alt="Logo" onerror="this.style.display='none'"> 
+
+            <button id="sidebar-toggle" class="btn-icon">☰</button>
+
+            <!-- <span>EduMate</span> -->
+            <!-- <a href="#" onclick="navigateTo('dashboard')">EduMate</a> -->
+
+            <a href="#" class="logo" onclick="navigateTo('dashboard')"><span>EduMate</span></a>
+
+            <!-- <div class="nav-item" onclick="navigateTo('dashboard')">
+            <span class="nav-item-text">EduMate</span> -->
+        </div>
+            
+        </div>
+        <nav class="nav-links">
+            <a href="#" onclick="navigateTo('faculty')">Faculty</a>
+            <a href="#" onclick="navigateTo('courses')">Courses</a>
+            <a href="#" onclick="navigateTo('events')">Events</a>
+        </nav>
+        <div class="controls">
+            <button id="theme-toggle" class="btn-icon">🌙</button>
+            <!-- <button id="sidebar-toggle" class="btn-icon">☰</button> -->
+            <button id="theme-toggle" class="btn-icon" onclick="signOut()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="log-out">
+            <path fill="#ff3838" fill-rule="evenodd" d="M151.059,222.739h243.925v-34.613c0-3.083,1.658-5.722,4.435-7.061,2.777-1.339,5.874-.993,8.287,.928l85.347,67.919c1.933,1.538,2.958,3.664,2.958,6.134s-1.025,4.596-2.958,6.134l-85.347,67.919c-2.412,1.92-5.51,2.267-8.287,.927-2.777-1.339-4.435-3.978-4.435-7.061v-34.613H151.059c-6.338,0-11.524-5.186-11.524-11.524v-43.564c0-6.338,5.186-11.524,11.524-11.524Z"></path>
+            <path fill="#ff3838" fill-rule="evenodd" d="M327.17,16.045H46.314c-16.667,0-30.305,13.637-30.305,30.304V465.74c0,16.667,13.637,30.304,30.305,30.304H327.17c16.667,0,30.304-13.637,30.304-30.304v-83.267c0-6.611-5.392-12.003-12.003-12.003h-42.607c-6.611,0-12.003,5.392-12.003,12.003v46.959H82.622V82.657h208.241v46.96c0,6.61,5.392,12.003,12.003,12.003h42.607c6.611,0,12.003-5.392,12.003-12.003V46.349c0-16.667-13.637-30.304-30.304-30.304Z"></path>
+            <path fill-rule="evenodd" d="M46.314,25.998c-11.202,0-20.311,9.109-20.311,20.311V465.701c0,11.188,9.109,20.296,20.311,20.296H327.163c11.197,0,20.311-9.109,20.311-20.296v-83.274c0-1.087-.924-1.997-2.011-1.997h-42.599c-1.093,0-2.002,.909-2.002,1.997v46.964c0,5.519-4.48,9.999-9.999,9.999H82.624c-5.534,0-10.004-4.48-10.004-9.999V82.609c0-5.519,4.47-9.999,10.004-9.999h208.238c5.519,0,9.999,4.48,9.999,9.999v46.959c0,1.092,.909,2.011,2.002,2.011h42.599c1.087,0,2.011-.919,2.011-2.011V46.309c0-11.202-9.114-20.311-20.311-20.311H46.314ZM327.163,506H46.314c-22.231,0-40.314-18.078-40.314-40.299V46.309C6,24.078,24.083,6,46.314,6H327.163c22.231,0,40.309,18.078,40.309,40.309v83.26c0,12.14-9.869,22.009-22.009,22.009h-42.599c-12.131,0-22-9.869-22-22.009v-36.96H92.623V419.392h188.24v-36.965c0-12.126,9.869-21.995,22-21.995h42.599c12.14,0,22.009,9.869,22.009,21.995v83.274c0,22.221-18.078,40.299-40.309,40.299h0ZM151.054,232.701h253.927v-40.141l79.703,63.44-79.703,63.439v-40.131H151.054c-.813,0-1.52-.707-1.52-1.53v-43.557c0-.813,.707-1.521,1.52-1.521h0Zm251.8,109.08c-2.632,0-5.293-.592-7.781-1.79-6.231-3.002-10.09-9.162-10.09-16.072v-24.608H151.054c-11.871,0-21.519-9.662-21.519-21.533v-43.557c0-11.871,9.648-21.523,21.519-21.523h233.929v-24.617c0-6.91,3.859-13.069,10.09-16.072,6.217-2.998,13.449-2.19,18.858,2.108l85.334,67.924c4.331,3.46,6.737,8.406,6.737,13.959s-2.406,10.509-6.737,13.959l-85.343,67.919c-3.229,2.579-7.131,3.903-11.067,3.903Z"></path>
+            </svg></button>
+
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-profile" onclick="navigateTo('profile')">
+            
+            <img id="profile-pic" class="profile-pic" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F036%2F885%2F313%2Foriginal%2Fblue-profile-icon-free-png.png&f=1&nofb=1&ipt=835f4c686ca5c7c40c36d1d27d110a772754ba33d4d707b84606d4cf250ecde1">
+            <div>
+                <div id="profile-name" style="font-weight:700">Guest</div>
+                <div style="font-size:0.85rem;color:var(--muted)">Student</div>
+                
+            </div>    
+        </div>
+        <!-- <div class="nav-item" onclick="navigateTo('dashboard')">
+            <span>📊</span> <span class="nav-item-text">Dashboard</span>
+        </div> -->
+        <div class="nav-item" onclick="navigateTo('faculty')">
+            <span>🎓</span> <span class="nav-item-text">Faculty</span>
+        </div>
+        <div class="nav-item" onclick="navigateTo('events')">
+            <span>🎟</span> <span class="nav-item-text">Events</span>
+        </div>
+        <div class="nav-item" onclick="navigateTo('resume')">
+            <span>📄</span> <span class="nav-item-text">Resume</span>
+        </div>
+        <div class="nav-item" onclick="navigateTo('jobs')">
+            <span>💼</span> <span class="nav-item-text">Jobs</span>
+        </div>
+        <div class="nav-item" onclick="navigateTo('scholarships')">
+            <span><img width="18" height="18" src="https://img.icons8.com/stickers/100/scholarship.png" alt="scholarship"/></span><span class="nav-item-text">Scholarships</span>
+        </div>
+        <div class="nav-item" onclick="navigateTo('courses')">
+            <span>📚</span> <span class="nav-item-text">Courses</span>
+        </div>
+        <div class="nav-item" onclick="navigateTo('xai')">
+            <span>🤖</span> <span class="nav-item-text">AI Chat</span>
+        </div>
+        <!-- <div class="nav-item" onclick="navigateTo('profile')">
+            <span>👤</span> <span class="nav-item-text">Profile</span>
+        </div> -->
+         <!-- <div class="nav-item" onclick="signOut()">
+               <span>🔓</span> <span class="nav-item-text">Sign out</span>
+            </div> -->
+        </nav>
+
+    <!-- Main Content -->
+    <main id="mainContent" class="main-content">
+        <section id="welcome" class="page">
+    <div class="hero">
+        <!-- Logo and Branding -->
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div style="display: inline-flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.1); padding: 15px 30px; border-radius: 20px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
+                <img src="Edumate_logo.png" 
+                     alt="Edumate Logo" 
+                     style="height: 70px; width: auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));">
+                <div style="border-left: 2px solid rgba(255,255,255,0.3); height: 40px;"></div>
+                <div style="text-align: left;">
+                    <div style="font-size: 2rem; font-weight: 800; line-height: 1;">EduMate</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">Empower Your Future</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Welcome Text -->
+        <h1 style="margin-bottom: 10px;">Welcome!</h1>
+        <p style="font-size:1.3rem;margin-bottom:30px; max-width: 600px; margin-left: auto; margin-right: auto;">
+            Your AI-powered career companion for students and graduates
+        </p>
+        
+        <!-- Get Started Button -->
+        <button class="btn" onclick="navigateTo('login')" 
+                style="padding:15px 40px;font-size:1.2rem; border-radius: 50px; margin-top: 20px;">
+            🚀 Get Started
+        </button>
+        
+    </div>
+</section>
+
+        <!-- Home Page -->
+        <section id="home" class="page">
+            <div class="hero">
+                <h1>Empower Your Future</h1>
+                <p style="font-size:1.3rem">Your AI study companion and career guide.</p>
+            </div>
+        </section>
+
+        <!-- Login Page -->
+        <section id="login" class="page active">
+            <div class="login-root">
+                <div class="login-card">
+                    <h2 style="margin-top:0">Welcome back</h2>
+                    <p style="color:var(--muted);margin-bottom:24px">Sign in to access your Edumate account</p>
+                    
+                    <input id="login-email" class="input" placeholder="name@example.com" style="margin-bottom:12px">
+                    <input id="login-password" class="input" type="password" placeholder="Password" style="margin-bottom:20px">
+                    
+                    <div style="display:flex;gap:12px">
+                        <button class="btn" style="flex:1" onclick="attemptLogin()">Sign in</button>
+                        <button class="link-btn" style="flex:1" onclick="navigateTo('register')">Create account</button>
+                    </div>
+
+                    <div class="or-sep">OR CONTINUE WITH</div>
+
+                    <div class="socials">
+                        <button class="social-btn" onclick="firebaseLogin('google')">
+                            <svg width="20" height="20" viewBox="0 0 18 18">
+                                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+                                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.715H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                                <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.448 2.797 1.237 3.935l2.727-2.225z"/>
+                                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.682 7.151C4.389 5.018 6.374 3.58 9 3.58z"/>
+                            </svg>
+                            Google
+                        </button>
+                        
+                        <button class="social-btn" onclick="firebaseLogin('github')">
+                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+                                <path fill="#111" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2 .37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 012 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                            </svg> 
+                            GitHub
+                        </button>
+                        <button class="social-btn" onclick="firebaseLogin('microsoft')">
+                            <svg width="20" height="20" viewBox="0 0 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid">
+                                <g>
+                                    <polygon fill="#F1511B" points="121.666095 121.666095 0 121.666095 0 0 121.666095 0"/>
+                                    <polygon fill="#80CC28" points="256 121.666095 134.335356 121.666095 134.335356 0 256 0"/>
+                                    <polygon fill="#00ADEF" points="121.663194 256.002188 0 256.002188 0 134.336095 121.663194 134.336095"/>
+                                    <polygon fill="#FBBC09" points="256 256.002188 134.335356 256.002188 134.335356 134.336095 256 134.336095"/>
+                                </g>
+                            </svg> 
+                            Microsoft
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Register Page -->
+        <section id="register" class="page">
+            <div class="card" style="max-width:600px;margin:0 auto">
+                <h2>Create Account</h2>
+                <input id="reg-name" class="input" placeholder="Full Name" style="margin-bottom:12px">
+                <input id="reg-username" class="input" placeholder="Username" style="margin-bottom:12px">
+                <input id="reg-email" class="input" placeholder="Email" style="margin-bottom:12px">
+                <input id="reg-password" class="input" type="password" placeholder="Password" style="margin-bottom:12px">
+                <input id="reg-password-confirm" class="input" type="password" placeholder="Confirm Password" style="margin-bottom:20px">
+                <button class="btn" onclick="startRegistration()" style="width:100%">Create Account</button>
+                <p style="text-align:center;margin-top:16px;color:var(--muted)">
+                    Already have an account? <a href="#" onclick="navigateTo('login')" style="color:var(--primary);font-weight:600">Sign in</a>
+                </p>
+            </div>
+        </section>
+
+        <!-- Info Page -->
+        <section id="info" class="page">
+            <div class="card" style="max-width:600px;margin:0 auto">
+                <h2>Complete Your Profile</h2>
+                <img id="info-avatar-preview" class="avatar-large" src="https://via.placeholder.com/110/6C5CE7/FFFFFF?text=U" style="display:block;margin:0 auto 20px"><br>
+                <input id="info-profile-pic" type="file" accept="image/*" onchange="previewInfoAvatar(this)" style="margin-bottom:20px;width:100%">
+                <input id="info-fullname" class="input" placeholder="Full Name" style="margin-bottom:12px">
+                <input id="info-username" class="input" placeholder="Username" style="margin-bottom:12px">
+                <input id="info-email" class="input" placeholder="Email" style="margin-bottom:12px">
+                <input id="info-education" class="input" placeholder="Education (e.g., B.Sc Computer Science)" style="margin-bottom:12px">
+                <input id="info-major" class="input" placeholder="Major" style="margin-bottom:12px">
+                <input id="info-gradyear" class="input" placeholder="Graduation Year" style="margin-bottom:12px">
+                <input id="info-skills" class="input" placeholder="Skills (e.g., Python, SQL, Leadership)" style="margin-bottom:20px">
+                <button class="btn" onclick="completeRegistration()" style="width:100%">Create Account</button>
+            </div>
+        </section>
+
+        <section id="dashboard" class="page">
+    <div class="page-header">
+        <h2 style="margin:0">Dashboard</h2>
+        <div style="display:flex;align-items:center;gap:15px">
+            <span id="user-name" style="font-weight:600;color:var(--primary)"></span>
+            <button class="btn-icon" onclick="refreshDashboard()" title="Refresh">🔄</button>
+        </div>
+    </div>
+    
+    <!-- Welcome Message & Quick Stats -->
+    <div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:white">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+                <h3 style="margin:0;color:white">Welcome back! 👋</h3>
+                <p style="margin:5px 0 0;opacity:0.9">Here's your career progress today</p>
+            </div>
+            <div id="dashboard-date" style="font-weight:600"></div>
+        </div>
+    </div>
+    
+    <!-- Stats Grid -->
+    <div class="dashboard-grid" style="margin-bottom:20px">
+        <div class="card stat-card" style="text-align:center">
+            <div style="font-size:2rem;margin-bottom:10px">🎯</div>
+            <h3 style="margin:5px 0">Career Score</h3>
+            <div id="career-score" style="font-size:2rem;font-weight:800;color:var(--primary)">85</div>
+            <div style="font-size:0.9rem;color:var(--muted)">Out of 100</div>
+        </div>
+        
+        <div class="card stat-card" style="text-align:center">
+            <div style="font-size:2rem;margin-bottom:10px">📈</div>
+            <h3 style="margin:5px 0">Skill Growth</h3>
+            <div id="skill-growth" style="font-size:2rem;font-weight:800;color:#10B981">+12%</div>
+            <div style="font-size:0.9rem;color:var(--muted)">This month</div>
+        </div>
+        
+        <div class="card stat-card" style="text-align:center">
+            <div style="font-size:2rem;margin-bottom:10px">⏱️</div>
+            <h3 style="margin:5px 0">Learning Time</h3>
+            <div id="learning-time" style="font-size:2rem;font-weight:800;color:#F59E0B">15h</div>
+            <div style="font-size:0.9rem;color:var(--muted)">This week</div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions & Recent Activity -->
+    <div class="dashboard-grid" style="grid-template-columns:1fr 1fr;margin-bottom:20px">
+        <div class="card">
+            <h3 style="margin-top:0">🚀 Quick Actions</h3>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+                <button class="quick-action-btn" onclick="navigateTo('resume')">
+                    <span style="font-size:1.5rem">📄</span>
+                    <div>Update Resume</div>
+                </button>
+                <button class="quick-action-btn" onclick="navigateTo('jobs')">
+                    <span style="font-size:1.5rem">💼</span>
+                    <div>Find Jobs</div>
+                </button>
+                <button class="quick-action-btn" onclick="navigateTo('faculty')">
+                    <span style="font-size:1.5rem">🏛️</span>
+                    <div>Choose Faculty</div>
+                </button>
+                <button class="quick-action-btn" onclick="toggleAIPopup()">
+                    <span style="font-size:1.5rem">🤖</span>
+                    <div>AI Assistant</div>
+                </button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 style="margin-top:0">📅 Recent Activity</h3>
+            <div id="recent-activity" style="max-height:200px;overflow-y:auto">
+                <div class="activity-item">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="color:#10B981">✓</span>
+                        <div>
+                            <div style="font-weight:600">Resume Updated</div>
+                            <div style="font-size:0.85rem;color:var(--muted)">2 hours ago</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="activity-item">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="color:#F59E0B">🎓</span>
+                        <div>
+                            <div style="font-weight:600">Applied to Computer Science</div>
+                            <div style="font-size:0.85rem;color:var(--muted)">Yesterday</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="activity-item">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="color:#8B5CF6">🤖</span>
+                        <div>
+                            <div style="font-weight:600">Chatted with AI Assistant</div>
+                            <div style="font-size:0.85rem;color:var(--muted)">2 days ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Learning progress -->
+    <div class="card" style="text-align:center">
+    <h3>📚 Learning</h3>
+    <p style="color:var(--muted)">Continue your courses</p>
+    <div class="learning-progress" style="font-size:2rem;font-weight:800;color:#10B981">65%</div>
+    <button class="btn" onclick="navigateTo('courses')" style="margin-top:10px;width:100%">View Courses</button>
+        </div>
+    
+    <!-- Upcoming Events -->
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+            <h3 style="margin:0">🎟 Upcoming Events</h3>
+            <button class="link-btn" onclick="navigateTo('events')">View All</button>
+        </div>
+        <div id="upcoming-events">
+            <!-- Events will be loaded here -->
+        </div>
+    </div>
+</section>
+
+        <!-- Faculty Page -->
+        <section id="faculty" class="page">
+            <h2>Faculty Recommendations</h2>
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Computer Science</h3>
+                    <p style="color:var(--muted);margin:8px 0">95% match based on your skills</p>
+                    <a href="https://sut.edu.eg/academic-fileds/computer-science-technology/" target="_blank" style="text-decoration:none">
+                        <button class="btn">Apply</button>
+                    </a>
+                </div>
+                
+                <div class="card">
+                    <h3>Data Science</h3>
+                    <p style="color:var(--muted);margin:8px 0">88% match</p>
+                    <a href="https://sut.edu.eg/apply-now/" target="_blank" style="text-decoration:none">
+                        <button class="btn">Apply</button>
+                    </a>
+                </div>
+                
+                <div class="card">
+                    <h3>Cyber Security</h3>
+                    <p style="color:var(--muted);margin:8px 0">84% match</p>
+                    <a href="https://sut.edu.eg/apply-now/" target="_blank" style="text-decoration:none">
+                        <button class="btn">Apply</button>
+                    </a>
+                </div>
+                
+                <div class="card">
+                    <h3>Networks</h3>
+                    <p style="color:var(--muted);margin:8px 0">95% match</p>
+                    <a href="https://sut.edu.eg/apply-now/" target="_blank" style="text-decoration:none">
+                        <button class="btn">Apply</button>
+                    </a>
+                </div>
+                
+                <div class="card">
+                    <h3>Top Recommended University</h3>
+                    <p style="color:var(--muted);margin:8px 0">100% match for your major</p>
+                    <a href="https://sut.edu.eg/#" target="_blank" style="text-decoration:none">
+                        <button class="btn">Apply</button>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Events Page -->
+        <section id="events" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Events</h2>
+                <select id="majorSelect" class="input" style="max-width:300px" onchange="loadEventsByMajor()">
+                    <option value="">Choose Your Major</option>
+                    <option value="cs">Computer Science</option>
+                    <option value="masscomm">Mass Communication</option>
+                    <option value="business">Business</option>
+                    <option value="engineering">Engineering</option>
+                    <option value="medicine">Medicine</option>
+                </select>
+            </div>
+            <div id="eventsContainer" style="margin-top:20px">
+                <div class="card" style="text-align:center;color:var(--muted);padding:40px">
+                    <p>Select a major to see relevant events</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Jobs Page -->
+        <section id="jobs" class="page">
+            <h2>Job Recommendations</h2>
+            <div id="jobs-list" class="dashboard-grid"></div>
+        </section>
+
+        <!-- Scholarships Page -->
+        <section id="scholarships" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Scholarships</h2>
+                <select id="scholarshipMajorSelect" class="input" style="max-width:300px" onchange="loadScholarshipsByMajor()">
+                    <option value="">Choose Your Major</option>
+                    <option value="cs">Computer Science</option>
+                    <option value="masscomm">Mass Communication</option>
+                    <option value="business">Business</option>
+                    <option value="engineering">Engineering</option>
+                    <option value="medicine">Medicine</option>
+                </select>
+            </div>
+            <div id="scholarshipsContainer" style="margin-top:20px">
+                <div class="card" style="text-align:center;color:var(--muted);padding:40px">
+                    <p>Select a major to see relevant scholarships</p>
+                </div>
+            </div>
+        </section>
+                
+        <!-- Resume Page -->
+               
+        <section id="resume" class="page">
+   
+            <h2>Resume Builder</h2>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+                <button class="btn" onclick="showResumeForm()">Edit Resume Data</button>
+                <button class="btn" onclick="generateResumePreview()">Preview Resume</button>
+            </div>
+
+            <!-- Resume template-->
+            <div class="card" style="margin-bottom:20px">
+                <h3>Choose Template</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="modern" checked onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#6C5CE7;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Modern</div>
+                            <small>Clean & ATS-friendly</small>
+                        </div>
+                    </label>
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="elegant" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#1E293B;color:#E2E8F0;padding:20px;border-radius:8px;margin-bottom:8px">Elegant</div>
+                            <small>Professional & minimal</small>
+                        </div>
+                    </label>
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="creative" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:linear-gradient(135deg,#8B5CF6,#EC4899);color:white;padding:20px;border-radius:8px;margin-bottom:8px">Creative</div>
+                            <small>Bold & eye-catching</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="classic" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#334155;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Classic</div>
+                            <small>Two-column professional layout</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="compact" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#0f172a;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Compact</div>
+                            <small>Slim, space-efficient</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="harvard" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#475569;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Harvard</div>
+                            <small>Clean left bar layout</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="sidebar" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#111827;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Sidebar</div>
+                            <small>Bold left sidebar look</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="minimalHeader" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#475569;color:white;padding:20px;border-radius:8px;margin-bottom:8px">minimalHeader</div>
+                            <small>Clean left bar layout</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="sidebarPhoto" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#111827;color:white;padding:20px;border-radius:8px;margin-bottom:8px">Sidebar Photo</div>
+                            <small>Bold left sidebar look with photo</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="softPink" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#475569;color:white;padding:20px;border-radius:8px;margin-bottom:8px">softPink</div>
+                            <small>Pink-themed soft design</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="blueProfessional" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#1e3a8a;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Blue Professional
+                            </div>
+                            <small>Strong corporate look</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="blueModernHeader" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#0f172a;color:#93c5fd;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Blue Modern Header
+                            </div>
+                            <small>Sleek dark header</small>
+                        </div>
+                    </label>
+
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="minimalElegantPhoto" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#f1f5f9;color:#1e293b;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Minimal Elegant
+                            </div>
+                            <small>Clean layout + circle header</small>
+                        </div>
+                    </label>
+                    
+                    <!-- NEW TEMPLATES BASED ON IMAGES -->
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="professionalTwoColumn" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#2c3e50;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Professional Two-Column
+                            </div>
+                            <small>Like JAMES STELE resume</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="cleanHeader" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#34495e;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Clean Header
+                            </div>
+                            <small>Simple professional layout</small>
+                        </div>
+                    </label>
+                    
+                    <label style="cursor:pointer">
+                        <input type="radio" name="template" value="academicStyle" onchange="generateResumePreview()">
+                        <div style="border:2px solid #ddd;padding:12px;border-radius:8px;text-align:center">
+                            <div style="background:#2d3436;color:white;padding:20px;border-radius:8px;margin-bottom:8px">
+                                Academic Style
+                            </div>
+                            <small>University/entry-level format</small>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Resume Form  -->
+            <div id="resume-form" class="card">
+                <h3>Edit Your Resume</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+                    <input id="res-name" class="input" placeholder="Full Name">
+                    <input id="res-title" class="input" placeholder="Professional Title (e.g. Software Engineer)">
+                    <input id="res-email" class="input" placeholder="Email">
+                    <input id="res-phone" class="input" placeholder="Phone">
+                    <input id="res-location" class="input" placeholder="City, Country">
+                    <input id="res-linkedin" class="input" placeholder="LinkedIn URL">
+                    <input id="res-github" class="input" placeholder="GitHub URL">
+                </div>
+                
+                <h4 style="margin:20px 0 10px">Education</h4>
+                <div id="education-container">
+                    <div class="education-entry" style="border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px">
+                        <input placeholder="Degree (e.g. B.Sc Computer Science)" class="input" style="margin-bottom:8px">
+                        <input placeholder="University" class="input" style="margin-bottom:8px">
+                        <input placeholder="Graduation Year (e.g. 2025)" class="input">
+                    </div>
+                </div>
+                <button class="link-btn" onclick="addEducation()">+ Add Education</button>
+
+                <h4 style="margin:20px 0 10px">Experience</h4>
+                <div id="experience-container">
+                    <div class="experience-entry" style="border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px">
+                        <input placeholder="Job Title" class="input" style="margin-bottom:8px">
+                        <input placeholder="Company" class="input" style="margin-bottom:8px">
+                        <input placeholder="Dates (e.g. Jan 2023 – Present)" class="input" style="margin-bottom:8px">
+                        <textarea placeholder="Responsibilities & Achievements" class="input" rows="3"></textarea>
+                    </div>
+                </div>
+                <button class="link-btn" onclick="addExperience()">+ Add Experience</button>
+
+                <h4 style="margin:20px 0 10px">Skills</h4>
+                <input id="res-skills" class="input" placeholder="e.g. Python, React, AWS, Leadership">
+                
+                <h4 style="margin:20px 0 10px">Summary</h4>
+                <textarea id="res-summary" class="input" placeholder="Professional summary or objective"></textarea>
+
+                <h4 style="margin:20px 0 10px">Projects (Optional)</h4>
+                <div id="projects-container"></div>
+                <button class="link-btn" onclick="addProject()">+ Add Project</button>
+
+                <button class="btn" style="margin-top:20px" onclick="saveResumeData()">Save & Preview</button>
+            </div>
+
+            <!-- Resume Preview -->
+            <div id="resume-preview" class="card" style="margin-top:20px;overflow:hidden">
+                <div style="text-align:center;padding:10px;background:#f1f5f9">
+                    <button class="btn" onclick="downloadResumePDF()">Download PDF</button>
+                    <button class="link-btn" onclick="checkATSCompatibility()">Check ATS Score</button>
+                </div>
+                <div id="resume-content" style="padding:40px;background:white;min-height:800px;font-family:Arial,sans-serif">
+                    <!-- Resume will be injected here -->
+                </div>
+            </div>
+
+            <div id="ats-feedback" class="card" style="margin-top:15px;display:none"></div>
+        </section>
+        <!-- Profile Page -->
+        <section id="profile" class="page">
+            <h2>Profile</h2>
+            <div class="progress-container" style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 0.9rem; color: var(--muted)">Profile Completion</span>
+                    <span id="profile-percentage" style="font-weight: 600; color: var(--primary)">0%</span>
+                </div>
+                <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
+                    <div id="profile-progress" style="height: 100%; background: var(--primary); width: 0%; transition: width 0.5s ease;"></div>
+                </div>
+            </div>
+            <div class="card">
+                <div style="text-align:center;margin-bottom:20px">
+                    <img id="profile-avatar-large" class="avatar-large" src="https://via.placeholder.com/110/6C5CE7/FFFFFF?text=U">
+                    <input id="profile-avatar-file" type="file" accept="image/*" onchange="changeProfileAvatar(this)" style="margin-top:10px">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+                    <input id="profile-name-input" class="input" placeholder="Full Name">
+                    <input id="profile-username-input" class="input" placeholder="Username">
+                    <input id="profile-email-input" class="input" placeholder="Email">
+                    <input id="profile-education-input" class="input" placeholder="Education">
+                    <input id="profile-major-input" class="input" placeholder="Major">
+                    <input id="profile-gradyear-input" class="input" placeholder="Graduation Year">
+                    <input id="profile-skills-input" class="input" placeholder="Skills (comma separated)">
+                </div>
+                <button class="btn" style="margin-top:20px;width:100%" onclick="saveProfileEdits()">💾 Save Changes</button>
+            </div>
+        </section>
+
+        <!-- AI Chat Page -->
+        <section id="xai" class="page">
+            <h2>🤖 AI Career Assistant</h2>
+            <br>
+            <div class="card" style="max-width:95 vw;margin:0 auto">
+                <div id="ai-chat-output" class="chat-output" style="min-height:200px;border-bottom:1px solid var(--border);padding-bottom:15px;margin-bottom:15px">
+                    <div style="text-align:center;color:var(--muted);padding:20px 0">
+                        <p>Ask me anything about:</p>
+                        <ul style="text-align:left;display:inline-block;color:var(--muted);font-size:0.9rem">
+                            <li>• Faculty recommendations</li>
+                            <li>• Resume optimization</li>
+                            <li>• Job search strategies</li>
+                            <li>• Interview preparation</li>
+                        </ul>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px">
+                    <input id="ai-chat-input" class="input" placeholder="Type your question here..." style="flex:1">
+                    <button class="btn" onclick="sendAIChatMessage()">Send</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Courses Page -->
+        <section id="courses" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">🎓 Courses & Learning</h2>
+                <div style="display:flex;gap:10px">
+                    <select id="course-category" class="input" style="width:auto;padding:8px 12px" onchange="filterCourses()">
+                        <option value="all">All Categories</option>
+                        <option value="tech">Technology</option>
+                        <option value="business">Business</option>
+                        <option value="soft-skills">Soft Skills</option>
+                        <option value="career">Career Development</option>
+                    </select>
+                    <button class="btn" onclick="showCourseModal()">+ Add Course</button>
+                </div>
+            </div>
+            
+            <!-- Progress Overview -->
+            <div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:white">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <h3 style="margin:0;color:white">Your Learning Journey</h3>
+                        <p style="margin:5px 0 0;opacity:0.9">Track your progress and discover new courses</p>
+                    </div>
+                    <div style="text-align:center">
+                        <div style="font-size:2rem;font-weight:800">3</div>
+                        <div style="font-size:0.9rem;opacity:0.9">Active Courses</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Course Categories -->
+            <div class="dashboard-grid" style="margin-bottom:20px">
+                <div class="card" style="text-align:center">
+                    <div style="font-size:2rem;margin-bottom:10px">💻</div>
+                    <h3>Technology</h3>
+                    <p style="color:var(--muted)">Programming, AI, Data Science</p>
+                    <button class="btn" onclick="filterCourses('tech')" style="margin-top:10px;width:100%">Browse</button>
+                </div>
+                
+                <div class="card" style="text-align:center">
+                    <div style="font-size:2rem;margin-bottom:10px">📊</div>
+                    <h3>Business</h3>
+                    <p style="color:var(--muted)">Management, Marketing, Finance</p>
+                    <button class="btn" onclick="filterCourses('business')" style="margin-top:10px;width:100%">Browse</button>
+                </div>
+                
+                <div class="card" style="text-align:center">
+                    <div style="font-size:2rem;margin-bottom:10px">🗣️</div>
+                    <h3>Soft Skills</h3>
+                    <p style="color:var(--muted)">Communication, Leadership</p>
+                    <button class="btn" onclick="filterCourses('soft-skills')" style="margin-top:10px;width:100%">Browse</button>
+                </div>
+                
+                <div class="card" style="text-align:center">
+                    <div style="font-size:2rem;margin-bottom:10px">🚀</div>
+                    <h3>Career Dev</h3>
+                    <p style="color:var(--muted)">Interview, Resume, Networking</p>
+                    <button class="btn" onclick="filterCourses('career')" style="margin-top:10px;width:100%">Browse</button>
+                </div>
+            </div>
+            
+            <!-- My Courses Section -->
+            <h3>📚 My Enrolled Courses</h3>
+            <div id="my-courses" class="dashboard-grid" style="margin-bottom:30px">
+                <!-- Courses will be loaded here -->
+            </div>
+            
+            <!-- Recommended Courses -->
+            <h3>🔥 Recommended For You</h3>
+            <div id="recommended-courses" class="dashboard-grid">
+                <!-- Recommended courses will be loaded here -->
+            </div>
+        </section>
+    </main>
+
+    <!-- AI Bubble -->
+    <div id="aiBubble" class="ai-bubble" onclick="toggleAIPopup()">🤖</div>
+    
+    <!-- AI Popup -->
+    <div id="aiPopup" class="ai-popup">
+        <div style="padding:15px;border-bottom:1px solid var(--border);font-weight:600;background:var(--card)">AI Assistant</div>
+        <div id="ai-popup-output" class="chat-output">💡 Click the bubble to chat!</div>
+        <div style="padding:12px;border-top:1px solid var(--border);background:var(--card)">
+            <div style="display:flex;gap:10px">
+                <input id="ai-popup-input" class="input" placeholder="Quick question..." style="flex:1">
+                <button class="btn" onclick="sendAIPopupMessage()" style="padding:10px 12px">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="script.js"></script>
+</body>
+
+</html>
