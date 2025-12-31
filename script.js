@@ -3111,3 +3111,4 @@ window.signOut = signOut;
 window.refreshDashboard = refreshDashboard;
 window.logActivity = logActivity;
 window.initDashboard = initDashboard;
+
