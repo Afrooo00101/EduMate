@@ -1,6 +1,6 @@
 # Edumate - AI-Powered Career Companion
 
-![Edumate Logo](edumate_logo.png)
+![Edumate Logo](Edumate_logo.png)
 
 ## 📋 Overview
 Edumate is a comprehensive web application designed to empower students and graduates in their career journey. It combines AI-powered guidance with practical tools for faculty discovery, resume building, job searching, and skill development.
