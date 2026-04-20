@@ -46,7 +46,7 @@
         </nav>
         
         <div class="controls">
-            <button id="theme-toggle" class="btn-icon">â˜€ï¸</button>
+            <button id="theme-toggle" class="btn-icon">☀️</button>
             <button class="btn-icon" onclick="signOut()">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20">
                     <path fill="#ff3838" fill-rule="evenodd" d="M151.059,222.739h243.925v-34.613c0-3.083,1.658-5.722,4.435-7.061,2.777-1.339,5.874-.993,8.287,.928l85.347,67.919c1.933,1.538,2.958,3.664,2.958,6.134s-1.025,4.596-2.958,6.134l-85.347,67.919c-2.412,1.92-5.51,2.267-8.287,.927-2.777-1.339-4.435-3.978-4.435-7.061v-34.613H151.059c-6.338,0-11.524-5.186-11.524-11.524v-43.564c0-6.338,5.186-11.524,11.524-11.524Z"></path>
@@ -347,8 +347,8 @@
                     <input id="user-search" class="input" placeholder="Search users..." style="width:250px; padding:10px;">
                     <select id="user-filter" class="input" style="width:150px; padding:10px;">
                         <option value="all">All Users</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
+                        <option value="online">Online</option>
+                        <option value="offline">Offline</option>
                         <option value="blocked">Blocked</option>
                     </select>
                     <button class="btn" style="padding:10px 16px;" onclick="searchUsers()">Search</button>
@@ -361,8 +361,8 @@
                         <tr style="border-bottom:2px solid var(--border)">
                             <th style="text-align:left;padding:8px">User</th>
                             <th style="text-align:left;padding:8px">Email</th>
-                            <th style="text-align:left;padding:8px">Location</th>
-                            <th style="text-align:left;padding:8px">Last Active</th>
+                            <th style="text-align:left;padding:8px">IP</th>
+                            <th style="text-align:left;padding:8px">Last Login</th>
                             <th style="text-align:left;padding:8px">Status</th>
                             <th style="text-align:left;padding:8px">Actions</th>
                         </tr>

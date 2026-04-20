@@ -626,6 +626,283 @@ a {
     color: #e2e8f0;
 }
 
+.ats-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2500;
+    padding: 24px;
+}
+
+.ats-modal.is-open {
+    display: flex;
+}
+
+.ats-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.58);
+    backdrop-filter: blur(5px);
+}
+
+.ats-modal-dialog {
+    position: relative;
+    width: min(980px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    border-radius: 24px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+    padding: 28px;
+    border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.dark-theme .ats-modal-dialog {
+    background: linear-gradient(180deg, #172033 0%, #0f172a 100%);
+    border-color: rgba(96, 165, 250, 0.18);
+}
+
+.ats-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.08);
+    color: var(--dark);
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.ats-modal-close:hover {
+    transform: scale(1.05);
+    background: rgba(37, 99, 235, 0.14);
+}
+
+.dark-theme .ats-modal-close {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.ats-modal-header {
+    margin-bottom: 22px;
+    padding-right: 52px;
+}
+
+.ats-modal-kicker {
+    color: var(--primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.ats-modal-header h3 {
+    margin: 0;
+    font-size: 1.9rem;
+}
+
+.ats-modal-subtitle {
+    margin: 8px 0 0;
+    color: var(--muted);
+}
+
+.ats-report {
+    display: grid;
+    gap: 18px;
+}
+
+.ats-hero {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) 1fr;
+    gap: 20px;
+    align-items: stretch;
+}
+
+.ats-score-panel,
+.ats-summary-panel,
+.ats-breakdown-card,
+.ats-card {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(37, 99, 235, 0.1);
+    border-radius: 20px;
+    padding: 20px;
+}
+
+.dark-theme .ats-score-panel,
+.dark-theme .ats-summary-panel,
+.dark-theme .ats-breakdown-card,
+.dark-theme .ats-card {
+    background: rgba(15, 23, 42, 0.52);
+    border-color: rgba(96, 165, 250, 0.14);
+}
+
+.ats-score-ring-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.ats-score-ring {
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    box-shadow: inset 0 0 24px rgba(37, 99, 235, 0.12);
+}
+
+.ats-score-ring-value {
+    text-align: center;
+}
+
+.ats-score-ring-value strong {
+    display: block;
+    font-size: 2.7rem;
+    line-height: 1;
+}
+
+.ats-score-ring-value span {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.ats-grade-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    background: var(--primary-light);
+    color: var(--primary);
+    margin-bottom: 14px;
+}
+
+.ats-score-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.ats-mini-stat {
+    padding: 12px 14px;
+    background: rgba(37, 99, 235, 0.08);
+    border-radius: 16px;
+}
+
+.ats-mini-stat .label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+}
+
+.ats-mini-stat .value {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.ats-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.ats-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ats-chip {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.ats-breakdown-bars {
+    display: grid;
+    gap: 14px;
+}
+
+.ats-breakdown-row {
+    display: grid;
+    gap: 6px;
+}
+
+.ats-breakdown-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.95rem;
+}
+
+.ats-breakdown-track {
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.22);
+    overflow: hidden;
+}
+
+.ats-breakdown-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2563eb 0%, #22c55e 100%);
+}
+
+.ats-insights-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.ats-card h4,
+.ats-breakdown-card h4 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+}
+
+.ats-list {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 8px;
+}
+
+.ats-empty {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+@media (max-width: 860px) {
+    .ats-hero,
+    .ats-insights-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ats-modal {
+        padding: 12px;
+    }
+
+    .ats-modal-dialog {
+        padding: 20px;
+        border-radius: 20px;
+    }
+}
+
 /* =============================== */
 /* COURSES PAGE STYLES */
 /* =============================== */

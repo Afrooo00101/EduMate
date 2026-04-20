@@ -152,54 +152,75 @@ function checkGlobalRateLimit(actionKey) {
     }
 }
 
-// Toast notification system
-const Toast = {
-    container: document.getElementById('toast-container'),
-    
-    show(message, type = 'info', duration = 3000) {
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        
-        const icons = {
-            success: 'âœ…',
-            error: 'âŒ',
-            warning: 'âš ï¸',
-            info: 'â„¹ï¸'
-        };
-        
-        toast.innerHTML = `
-            <div class="toast-icon">${icons[type]}</div>
-            <div class="toast-content">
-                <div class="toast-message">${message}</div>
-            </div>
-            <button class="toast-close" onclick="this.parentElement.remove()">âœ•</button>
-        `;
-        
-        this.container.appendChild(toast);
-        
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => toast.remove(), 300);
-            }
-        }, duration);
-    },
-    
-    success(message) {
-        this.show(message, 'success');
-    },
-    
-    error(message) {
-        this.show(message, 'error');
-    },
-    
-    warning(message) {
-        this.show(message, 'warning');
-    },
-    
-    info(message) {
-        this.show(message, 'info');
+function normalizePopupMessage(message, fallback = 'Something went wrong.') {
+    const text = String(message || fallback).replace(/\s+/g, ' ').trim();
+    if (!text) return fallback;
+    if (/127\.0\.0\.1|localhost|failed to fetch|networkerror|load failed/i.test(text)) {
+        return 'We could not connect to the server right now. Please try again in a moment.';
     }
+    if (/request timed out|timeout/i.test(text)) {
+        return 'The request took too long. Please try again.';
+    }
+    return text;
+}
+
+function ensurePopupStyles() {
+    if (document.getElementById('edumate-popup-style')) return;
+    const style = document.createElement('style');
+    style.id = 'edumate-popup-style';
+    style.textContent = `
+        .edumate-popup-stack{position:fixed;top:20px;right:20px;display:grid;gap:12px;z-index:5000;max-width:min(92vw,380px)}
+        .edumate-popup{position:relative;overflow:hidden;padding:14px 16px 14px 18px;border-radius:18px;color:#fff;
+            backdrop-filter:blur(18px);box-shadow:0 18px 45px rgba(15,23,42,.22);border:1px solid rgba(255,255,255,.18);
+            animation:edumatePopupIn .28s ease}
+        .edumate-popup::after{content:'';position:absolute;inset:auto 0 0 0;height:3px;background:rgba(255,255,255,.32)}
+        .edumate-popup.success{background:linear-gradient(135deg,rgba(5,150,105,.96),rgba(16,185,129,.94))}
+        .edumate-popup.error{background:linear-gradient(135deg,rgba(220,38,38,.97),rgba(248,113,113,.92))}
+        .edumate-popup.warning{background:linear-gradient(135deg,rgba(217,119,6,.97),rgba(251,191,36,.92))}
+        .edumate-popup.info{background:linear-gradient(135deg,rgba(37,99,235,.97),rgba(96,165,250,.92))}
+        .edumate-popup-title{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;opacity:.78;margin-bottom:4px;font-weight:700}
+        .edumate-popup-message{font-size:.97rem;line-height:1.45;font-weight:600;padding-right:18px}
+        .edumate-popup-close{position:absolute;top:10px;right:10px;border:none;background:transparent;color:#fff;font-size:1rem;cursor:pointer;opacity:.82}
+        .edumate-popup-hide{animation:edumatePopupOut .22s ease forwards}
+        @keyframes edumatePopupIn{from{opacity:0;transform:translateY(-8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes edumatePopupOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-6px) scale(.98)}}
+    `;
+    document.head.appendChild(style);
+}
+
+function showNotification(message, type = 'info', duration = 3000) {
+    ensurePopupStyles();
+    let stack = document.getElementById('edumate-popup-stack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'edumate-popup-stack';
+        stack.className = 'edumate-popup-stack';
+        document.body.appendChild(stack);
+    }
+
+    const popup = document.createElement('div');
+    popup.className = `edumate-popup ${type || 'info'}`;
+    popup.innerHTML = `
+        <button class="edumate-popup-close" type="button" aria-label="Close">×</button>
+        <div class="edumate-popup-title">${type || 'info'}</div>
+        <div class="edumate-popup-message">${normalizePopupMessage(message)}</div>
+    `;
+    popup.querySelector('.edumate-popup-close')?.addEventListener('click', () => popup.remove());
+    stack.appendChild(popup);
+
+    setTimeout(() => {
+        if (!popup.parentNode) return;
+        popup.classList.add('edumate-popup-hide');
+        setTimeout(() => popup.remove(), 220);
+    }, duration);
+}
+
+const Toast = {
+    show: showNotification,
+    success(message) { showNotification(message, 'success'); },
+    error(message) { showNotification(message, 'error'); },
+    warning(message) { showNotification(message, 'warning'); },
+    info(message) { showNotification(message, 'info'); }
 };
 
 // Client-side security logging
@@ -255,7 +276,7 @@ function toggleTheme() {
     
     const toggle = document.getElementById('theme-toggle');
     if (toggle) {
-        toggle.textContent = isDark ? 'â˜€ï¸' : 'ðŸŒ™';
+        toggle.textContent = isDark ? '☀️' : '🌙';
     }
 }
 
@@ -264,7 +285,7 @@ function updateThemeIcon() {
     const toggle = document.getElementById('theme-toggle');
     if (toggle) {
         const isDark = document.body.classList.contains('dark-theme');
-        toggle.textContent = isDark ? 'â˜€ï¸' : 'ðŸŒ™';
+        toggle.textContent = isDark ? '☀️' : '🌙';
     }
 }
 
@@ -282,4 +303,9 @@ window.handleSocialLogin = handleSocialLogin;
 window.handleForgotPassword = handleForgotPassword;
 window.toggleTheme = toggleTheme;
 window.checkSession = checkSession;
+window.showNotification = showNotification;
+window.Toast = Toast;
+window.alert = function (message) {
+    showNotification(message, 'info');
+};
 

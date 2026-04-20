@@ -1,8 +1,9 @@
 ﻿(function () {
-    const API_BASE = 'http://127.0.0.1:8000/api/v1';
+    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://127.0.0.1:8000/api/v1';
     const TOKEN_KEY = 'edumate_access_token';
     const USER_KEY = 'edumate_current_user';
     const DEFAULT_AVATAR = 'https://via.placeholder.com/110/2563eb/FFFFFF?text=U';
+    const DEV_CAPTCHA_TOKEN = 'test-pass';
 
     const legacySearchCourses = typeof window.searchCourses === 'function' ? window.searchCourses : null;
     const legacyLoadInternshipsByPosition = typeof window.loadInternshipsByPosition === 'function' ? window.loadInternshipsByPosition : null;
@@ -16,21 +17,71 @@
     let cachedMajors = null;
     let cachedCourses = [];
     let cachedSavedInternships = [];
+    let latestATSResult = null;
+
+    function normalizePopupMessage(message, fallback = 'Something went wrong.') {
+        const text = String(message || fallback).replace(/\s+/g, ' ').trim();
+        if (!text) return fallback;
+        if (/127\.0\.0\.1|localhost|failed to fetch|networkerror|load failed/i.test(text)) {
+            return 'We could not connect to the server right now. Please try again in a moment.';
+        }
+        if (/request timed out|timeout/i.test(text)) {
+            return 'The request took too long. Please try again.';
+        }
+        return text;
+    }
+
+    function parseStudentIdentityFromEmail(email) {
+        const normalized = String(email || '').trim().toLowerCase();
+        const match = normalized.match(/^([a-z]+)(\d{3,})@sut\.edu\.eg$/i);
+        if (!match) return null;
+        const firstName = match[1];
+        const studentCode = match[2];
+        return {
+            firstName,
+            fullName: firstName.charAt(0).toUpperCase() + firstName.slice(1),
+            studentCode,
+        };
+    }
+
+    function syncDerivedStudentFields(emailInputId, nameInputId, studentCodeInputId) {
+        const emailElement = document.getElementById(emailInputId);
+        const nameElement = document.getElementById(nameInputId);
+        const codeElement = document.getElementById(studentCodeInputId);
+        if (!emailElement || !nameElement || !codeElement) return;
+
+        const parsed = parseStudentIdentityFromEmail(emailElement.value);
+        if (parsed) {
+            nameElement.value = parsed.fullName;
+            codeElement.value = parsed.studentCode;
+            nameElement.readOnly = true;
+            codeElement.readOnly = true;
+            nameElement.dataset.derived = '1';
+            codeElement.dataset.derived = '1';
+            return;
+        }
+
+        nameElement.readOnly = false;
+        codeElement.readOnly = false;
+        delete nameElement.dataset.derived;
+        delete codeElement.dataset.derived;
+    }
 
     function notify(message, type) {
+        const friendlyMessage = normalizePopupMessage(message);
         if (typeof window.showNotification === 'function') {
-            window.showNotification(message, type || 'info');
+            window.showNotification(friendlyMessage, type || 'info');
             return;
         }
         if (window.Toast && typeof window.Toast.error === 'function' && type === 'error') {
-            window.Toast.error(message);
+            window.Toast.error(friendlyMessage);
             return;
         }
         if (window.Toast && typeof window.Toast.success === 'function' && type === 'success') {
-            window.Toast.success(message);
+            window.Toast.success(friendlyMessage);
             return;
         }
-        alert(message);
+        alert(friendlyMessage);
     }
 
     function getToken() {
@@ -112,11 +163,16 @@
             headers.Authorization = `Bearer ${token}`;
         }
 
-        const response = await fetch(`${API_BASE}${path}`, {
-            method: requestOptions.method || 'GET',
-            headers,
-            body: requestOptions.body,
-        });
+        let response;
+        try {
+            response = await fetch(`${API_BASE}${path}`, {
+                method: requestOptions.method || 'GET',
+                headers,
+                body: requestOptions.body,
+            });
+        } catch (_error) {
+            throw new Error('We could not connect to the server right now. Please try again in a moment.');
+        }
 
         if (response.status === 401) {
             clearSession();
@@ -153,12 +209,16 @@
     }
 
     function getCaptchaToken(required) {
+        const isLocalApi = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?/i.test(API_BASE);
         if (typeof window.grecaptcha !== 'undefined') {
             const token = window.grecaptcha.getResponse();
+            if (required && !token && isLocalApi) return DEV_CAPTCHA_TOKEN;
             if (required && !token) throw new Error('CAPTCHA required');
-            return token || 'test-pass';
+            return token || '';
         }
-        return 'test-pass';
+        if (required && isLocalApi) return DEV_CAPTCHA_TOKEN;
+        if (required) throw new Error('CAPTCHA is not available');
+        return '';
     }
 
     async function refreshCurrentUser() {
@@ -207,6 +267,149 @@
         output.appendChild(row);
         output.scrollTop = output.scrollHeight;
     }
+
+    function clampScore(value, max) {
+        const number = Number(value) || 0;
+        return Math.max(0, Math.min(number, max));
+    }
+
+    function escapeListItems(items) {
+        return items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+    }
+
+    function buildATSBreakdownRows(breakdown) {
+        const metrics = [
+            { key: 'skills', label: 'Skills Match', max: 30 },
+            { key: 'experience', label: 'Experience Depth', max: 25 },
+            { key: 'education', label: 'Education Coverage', max: 15 },
+            { key: 'summary', label: 'Summary Quality', max: 15 },
+            { key: 'contact', label: 'Contact Completeness', max: 15 },
+        ];
+        return metrics.map((metric) => {
+            const score = clampScore(breakdown[metric.key], metric.max);
+            const width = (score / metric.max) * 100;
+            return `
+                <div class="ats-breakdown-row">
+                    <div class="ats-breakdown-head">
+                        <span>${metric.label}</span>
+                        <strong>${score}/${metric.max}</strong>
+                    </div>
+                    <div class="ats-breakdown-track">
+                        <div class="ats-breakdown-fill" style="width:${width}%"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function openATSReport(result) {
+        const modal = document.getElementById('ats-modal');
+        const body = document.getElementById('ats-modal-body');
+        if (!modal || !body) return;
+
+        const breakdown = result.breakdown || {};
+        const detectedSkills = result.detected_skills || [];
+        const strengths = result.strengths || [];
+        const missingKeywords = result.missing_keywords || [];
+        const recommendations = result.recommendations || [];
+        const totalScore = clampScore(result.score, 100);
+        const scoreColor = totalScore >= 85 ? '#16a34a' : totalScore >= 65 ? '#2563eb' : totalScore >= 45 ? '#f59e0b' : '#ef4444';
+        const ringStyle = `background:
+            radial-gradient(closest-side, ${document.body.classList.contains('dark-theme') ? '#111827' : '#fff'} 71%, transparent 72% 100%),
+            conic-gradient(${scoreColor} ${totalScore}%, rgba(148, 163, 184, 0.18) 0);`;
+
+        body.innerHTML = `
+            <div class="ats-report">
+                <section class="ats-hero">
+                    <div class="ats-score-panel">
+                        <div class="ats-score-ring-wrap">
+                            <div class="ats-score-ring" style="${ringStyle}">
+                                <div class="ats-score-ring-value">
+                                    <strong>${totalScore}</strong>
+                                    <span>out of 100</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ats-grade-pill">${escapeHtml(result.grade || 'N/A')}</div>
+                        <div class="ats-score-meta">
+                            <div class="ats-mini-stat">
+                                <span class="label">Keywords Found</span>
+                                <span class="value">${detectedSkills.length}</span>
+                            </div>
+                            <div class="ats-mini-stat">
+                                <span class="label">Gaps Found</span>
+                                <span class="value">${missingKeywords.length}</span>
+                            </div>
+                            <div class="ats-mini-stat">
+                                <span class="label">Strength Signals</span>
+                                <span class="value">${strengths.length}</span>
+                            </div>
+                            <div class="ats-mini-stat">
+                                <span class="label">Next Actions</span>
+                                <span class="value">${recommendations.length}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ats-summary-panel">
+                        <h4 style="margin-top:0">Snapshot</h4>
+                        <div class="ats-summary-grid">
+                            <div class="ats-card">
+                                <h4>What’s Working</h4>
+                                ${strengths.length ? `<ul class="ats-list">${escapeListItems(strengths)}</ul>` : '<div class="ats-empty">No standout strengths detected yet.</div>'}
+                            </div>
+                            <div class="ats-card">
+                                <h4>Immediate Fixes</h4>
+                                ${recommendations.length ? `<ul class="ats-list">${escapeListItems(recommendations)}</ul>` : '<div class="ats-empty">Your resume already covers the main ATS checks.</div>'}
+                            </div>
+                        </div>
+                        <div class="ats-card" style="margin-top:12px">
+                            <h4>Detected Skills</h4>
+                            ${detectedSkills.length ? `<div class="ats-chip-list">${detectedSkills.map((skill) => `<span class="ats-chip">${escapeHtml(skill)}</span>`).join('')}</div>` : '<div class="ats-empty">No recognizable skills were detected from the current resume data.</div>'}
+                        </div>
+                    </div>
+                </section>
+                <section class="ats-breakdown-card">
+                    <h4>Score Breakdown</h4>
+                    <div class="ats-breakdown-bars">${buildATSBreakdownRows(breakdown)}</div>
+                </section>
+                <section class="ats-insights-grid">
+                    <div class="ats-card">
+                        <h4>Missing Keywords</h4>
+                        ${missingKeywords.length ? `<ul class="ats-list">${escapeListItems(missingKeywords)}</ul>` : '<div class="ats-empty">No major keyword gaps detected.</div>'}
+                    </div>
+                    <div class="ats-card">
+                        <h4>Recommendations</h4>
+                        ${recommendations.length ? `<ul class="ats-list">${escapeListItems(recommendations)}</ul>` : '<div class="ats-empty">No additional fixes suggested right now.</div>'}
+                    </div>
+                    <div class="ats-card">
+                        <h4>Readiness Notes</h4>
+                        <ul class="ats-list">
+                            <li>Use the breakdown bars to focus the weakest resume section first.</li>
+                            <li>Add missing keywords naturally inside experience, projects, and skills.</li>
+                            <li>Re-run the report after each resume update to track progress.</li>
+                        </ul>
+                    </div>
+                </section>
+            </div>
+        `;
+
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    window.openATSReport = function () {
+        if (!latestATSResult) return;
+        openATSReport(latestATSResult);
+    };
+
+    window.closeATSReport = function () {
+        const modal = document.getElementById('ats-modal');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    };
 
     async function performLogin(email, password, remember, options) {
         const loginOptions = options || {};
@@ -289,9 +492,10 @@
             return;
         }
 
-        const studentCode = String(document.getElementById('info-username')?.value || temp.username || '').trim();
-        const fullName = String(document.getElementById('info-fullname')?.value || temp.name || '').trim();
         const email = String(document.getElementById('info-email')?.value || temp.email || '').trim();
+        const parsedIdentity = parseStudentIdentityFromEmail(email);
+        const studentCode = String(document.getElementById('info-username')?.value || parsedIdentity?.studentCode || temp.username || '').trim();
+        const fullName = String(document.getElementById('info-fullname')?.value || parsedIdentity?.fullName || temp.name || '').trim();
         const majorName = String(document.getElementById('info-major')?.value || '').trim();
         const graduationYearValue = String(document.getElementById('info-gradyear')?.value || '').trim();
         const skillsSummary = String(document.getElementById('info-skills')?.value || '').trim();
@@ -318,9 +522,8 @@
             });
             sessionStorage.setItem('edumate_major_name', majorName || '');
             sessionStorage.removeItem('edumate_temp_registration');
-            await performLogin(email, temp.password, true, { requireCaptcha: false, captchaToken: 'test-pass' });
             notify('Account created successfully', 'success');
-            if (typeof window.navigateTo === 'function') window.navigateTo('dashboard');
+            if (typeof window.navigateTo === 'function') window.navigateTo('login');
         } catch (error) {
             notify(error.message || 'Registration failed', 'error');
         }
@@ -353,6 +556,7 @@
             const element = document.getElementById(id);
             if (element) element.value = mappings[id] || '';
         });
+        syncDerivedStudentFields('profile-email-input', 'profile-name-input', 'profile-username-input');
         const userName = document.getElementById('user-name');
         if (userName) userName.textContent = user.full_name || user.student_code;
         if (typeof window.updateProfileCompletion === 'function') window.updateProfileCompletion();
@@ -365,9 +569,10 @@
             return;
         }
 
-        const studentCode = String(document.getElementById('profile-username-input')?.value || currentUser.student_code || '').trim();
-        const fullName = String(document.getElementById('profile-name-input')?.value || currentUser.full_name || '').trim();
         const email = String(document.getElementById('profile-email-input')?.value || currentUser.email || '').trim();
+        const parsedIdentity = parseStudentIdentityFromEmail(email);
+        const studentCode = String(document.getElementById('profile-username-input')?.value || parsedIdentity?.studentCode || currentUser.student_code || '').trim();
+        const fullName = String(document.getElementById('profile-name-input')?.value || parsedIdentity?.fullName || currentUser.full_name || '').trim();
         const majorName = String(document.getElementById('profile-major-input')?.value || getMajorLabel(currentUser) || '').trim();
         const graduationYearValue = String(document.getElementById('profile-gradyear-input')?.value || currentUser.graduation_year || '').trim();
         const skillsSummary = String(document.getElementById('profile-skills-input')?.value || currentUser.skills_summary || '').trim();
@@ -836,6 +1041,33 @@
         });
         const templateRadio = document.querySelector(`input[name="template"][value="${profile.template_name || 'modern'}"]`);
         if (templateRadio) templateRadio.checked = true;
+        if (profile.ats_score !== undefined && profile.ats_score !== null) {
+            renderATSFeedback({
+                score: profile.ats_score,
+                grade: profile.ats_score >= 85 ? 'Excellent' : profile.ats_score >= 65 ? 'Good' : profile.ats_score >= 45 ? 'Fair' : 'Poor',
+                strengths: ['Latest saved ATS score'],
+                missing_keywords: [],
+                detected_skills: [],
+                recommendations: [],
+                breakdown: { skills: 0, experience: 0, education: 0, summary: 0, contact: 0 },
+            });
+        }
+    }
+
+    function renderATSFeedback(result) {
+        const feedback = document.getElementById('ats-feedback');
+        const openReportButton = document.getElementById('open-ats-report-btn');
+        if (!feedback) return;
+        latestATSResult = result;
+        if (openReportButton) {
+            openReportButton.style.display = 'inline-flex';
+            openReportButton.textContent = `Open ATS Report (${clampScore(result.score, 100)}/100)`;
+        }
+        // feedback.style.display = 'block';
+        // feedback.innerHTML = `
+        //     <p style="margin:0;color:var(--muted)">ATS report is ready. Use the button next to Preview Resume to open the full popup report.</p>
+        // `;
+        openATSReport(result);
     }
 
     window.saveResumeData = async function () {
@@ -864,15 +1096,9 @@
     };
 
     window.checkATSCompatibility = async function () {
-        const feedback = document.getElementById('ats-feedback');
-        if (!feedback) return;
         try {
             const result = await apiFetch('/resume/ats-check', { method: 'POST', body: JSON.stringify(collectResumePayload()) });
-            feedback.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center"><strong>ATS Score</strong><span>${result.score}/100</span></div>
-                <div style="margin-top:12px"><strong>Strengths</strong><ul>${result.strengths.map((item) => `<li>${item}</li>`).join('')}</ul></div>
-                <div style="margin-top:12px"><strong>Missing Keywords</strong><ul>${result.missing_keywords.map((item) => `<li>${item}</li>`).join('')}</ul></div>
-            `;
+            renderATSFeedback(result);
         } catch (error) {
             notify(error.message || 'Failed to check ATS compatibility', 'error');
         }
@@ -1009,6 +1235,19 @@
             rememberInput.checked = true;
         }
 
+        [
+            ['reg-email', 'reg-name', 'reg-username'],
+            ['info-email', 'info-fullname', 'info-username'],
+            ['profile-email-input', 'profile-name-input', 'profile-username-input'],
+        ].forEach(([emailId, nameId, codeId]) => {
+            const emailElement = document.getElementById(emailId);
+            if (!emailElement) return;
+            const sync = function () { syncDerivedStudentFields(emailId, nameId, codeId); };
+            emailElement.addEventListener('input', sync);
+            emailElement.addEventListener('change', sync);
+            sync();
+        });
+
         if (getToken()) {
             const student = await refreshCurrentUser();
             if (student) {
@@ -1031,5 +1270,3 @@
         }
     });
 })();
-
-
