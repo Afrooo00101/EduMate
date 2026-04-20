@@ -9,6 +9,7 @@ if __package__ in (None, ''):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from jose import JWTError, jwt
 from sqlalchemy.exc import SQLAlchemyError
 
 import app.models  # noqa: F401
@@ -24,7 +25,10 @@ from app.api import (
     users_router,
 )
 from app.config import get_settings
-from app.database import Base, check_database_connection, engine
+from app.core.dependencies import get_client_ip
+from app.database import Base, SessionLocal, check_database_connection, engine
+from app.models import User
+from app.services.admin_settings_service import get_platform_settings, is_country_blocked, is_ip_blocked
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -54,10 +58,59 @@ app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+
+@app.middleware('http')
+async def enforce_platform_access_controls(request, call_next):
+    path = request.url.path
+    always_allowed = {'/', '/health', '/docs', '/openapi.json', '/redoc'}
+    login_path = f'{settings.api_v1_prefix}/auth/login'
+    logout_path = f'{settings.api_v1_prefix}/auth/logout'
+
+    if path in always_allowed:
+        return await call_next(request)
+
+    if path.startswith(settings.api_v1_prefix):
+        db = SessionLocal()
+        try:
+            platform_settings = get_platform_settings(db)
+            client_ip = get_client_ip(request)
+
+            if is_ip_blocked(db, client_ip):
+                return JSONResponse(status_code=403, content={'detail': 'Access denied from this IP address'})
+
+            if is_country_blocked(db, request):
+                return JSONResponse(status_code=403, content={'detail': 'Access denied from this region'})
+
+            if platform_settings.maintenance_mode and path not in {login_path, logout_path}:
+                is_admin = False
+                authorization = request.headers.get('authorization', '')
+                if authorization.startswith('Bearer '):
+                    token = authorization.split(' ', 1)[1].strip()
+                    try:
+                        payload = jwt.decode(token, settings.secret_key, algorithms=['HS256'])
+                        subject = payload.get('sub')
+                        if subject:
+                            user = db.query(User).filter(
+                                User.email == subject,
+                                User.role == 'admin',
+                                User.is_active.is_(True),
+                            ).first()
+                            is_admin = user is not None
+                    except JWTError:
+                        is_admin = False
+
+                if not is_admin:
+                    return JSONResponse(status_code=503, content={'detail': 'Platform is currently in maintenance mode'})
+        finally:
+            db.close()
+
+    return await call_next(request)
 
 
 

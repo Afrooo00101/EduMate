@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -17,22 +17,34 @@ class Major(TimestampMixin, Base):
     courses = relationship('Course', back_populates='major')
 
 
+class User(TimestampMixin, Base):
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    role = Column(String(20), nullable=False, default='student', index=True)
+    password_hash = Column(String(255), nullable=False)
+    remember_token = Column(String(255), nullable=True)
+    last_login = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    student = relationship('Student', back_populates='user', uselist=False, cascade='all, delete-orphan')
+
+
 class Student(TimestampMixin, Base):
     __tablename__ = 'students'
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, unique=True, index=True)
     student_code = Column(String(50), nullable=False, unique=True, index=True)
-    full_name = Column(String(150), nullable=False)
-    email = Column(String(255), nullable=False, unique=True, index=True)
-    password_hash = Column(String(255), nullable=False)
     gpa = Column(Float, default=0.0)
     major_id = Column(Integer, ForeignKey('majors.id', ondelete='SET NULL'))
     graduation_year = Column(Integer)
     skills_summary = Column(Text)
     profile_image_url = Column(String(500))
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_admin = Column(Boolean, default=False, nullable=False)
 
+    user = relationship('User', back_populates='student')
     major = relationship('Major', back_populates='students')
     student_skills = relationship('StudentSkill', back_populates='student', cascade='all, delete-orphan')
     course_enrollments = relationship('StudentCourse', back_populates='student', cascade='all, delete-orphan')
@@ -46,6 +58,54 @@ class Student(TimestampMixin, Base):
     activity_logs = relationship('ActivityLog', back_populates='student', cascade='all, delete-orphan')
     ai_chat_messages = relationship('AIChatMessage', back_populates='student', cascade='all, delete-orphan')
     planner_state = relationship('PlannerState', back_populates='student', uselist=False, cascade='all, delete-orphan')
+
+    @property
+    def full_name(self) -> str | None:
+        return self.user.name if self.user else None
+
+    @full_name.setter
+    def full_name(self, value: str | None) -> None:
+        if self.user is not None:
+            self.user.name = value
+
+    @property
+    def email(self) -> str | None:
+        return self.user.email if self.user else None
+
+    @email.setter
+    def email(self, value: str | None) -> None:
+        if self.user is not None:
+            self.user.email = value
+
+    @property
+    def password_hash(self) -> str | None:
+        return self.user.password_hash if self.user else None
+
+    @password_hash.setter
+    def password_hash(self, value: str | None) -> None:
+        if self.user is not None:
+            self.user.password_hash = value
+
+    @property
+    def is_active(self) -> bool:
+        return bool(self.user.is_active) if self.user else False
+
+    @is_active.setter
+    def is_active(self, value: bool) -> None:
+        if self.user is not None:
+            self.user.is_active = value
+
+    @property
+    def is_admin(self) -> bool:
+        return bool(self.user and self.user.role == 'admin')
+
+    @property
+    def role(self) -> str:
+        return self.user.role if self.user else 'student'
+
+    @property
+    def last_login(self):
+        return self.user.last_login if self.user else None
 
 
 class Skill(TimestampMixin, Base):

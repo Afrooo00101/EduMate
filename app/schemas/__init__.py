@@ -1,4 +1,13 @@
-﻿from app.schemas.analytics import ActivityLogCreate, ActivityLogRead, AnalyticsEventCreate, AnalyticsEventRead, DashboardResponse, DashboardStats, UpcomingEvent
+from app.schemas.admin_settings import (
+    AdminCreateRequest,
+    BlockedIPRuleCreate,
+    BlockedIPRuleRead,
+    CountryAccessRead,
+    CountryAccessUpdate,
+    PlatformSettingsRead,
+    PlatformSettingsUpdate,
+)
+from app.schemas.analytics import ActivityLogCreate, ActivityLogRead, AnalyticsEventCreate, AnalyticsEventRead, DashboardResponse, DashboardStats, UpcomingEvent
 from app.schemas.assistant import ChatMessageRead, ChatRequest
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
 from app.schemas.common import APIMessage

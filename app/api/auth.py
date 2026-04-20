@@ -1,4 +1,6 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Request, status
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.captcha import verify_captcha
@@ -6,6 +8,7 @@ from app.core.dependencies import InMemoryAttemptLimiter, get_client_ip
 from app.core.security import create_access_token, get_current_student
 from app.database import get_db
 from app.schemas import APIMessage, LoginRequest, RegisterRequest, StudentRead, TokenResponse
+from app.services.admin_settings_service import get_platform_settings, is_country_blocked, is_ip_blocked
 from app.services.auth_service import AuthService
 from app.utils.helpers import SuspiciousInputError, sanitize_model
 
@@ -31,6 +34,16 @@ async def register_student(payload: RegisterRequest, db: Session = Depends(get_d
 async def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     client_ip = get_client_ip(request)
     service = AuthService(db)
+    platform_settings = get_platform_settings(db)
+    login_limiter.max_attempts = platform_settings.max_login_attempts
+
+    if is_ip_blocked(db, client_ip):
+        service.log_security_event(client_ip, 'blocked_ip', payload.email, 'Login blocked by IP rule')
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Access denied from this IP address')
+
+    if is_country_blocked(db, request):
+        service.log_security_event(client_ip, 'blocked_country', payload.email, 'Login blocked by country access rule')
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Access denied from this region')
 
     precheck = login_limiter.check(client_ip)
     if not precheck.allowed:
@@ -56,9 +69,14 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail='Too many failed attempts. Temporary block applied.')
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Login failed')
 
+    if platform_settings.maintenance_mode and not student.is_admin:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Platform is currently in maintenance mode')
+
     login_limiter.reset(client_ip)
-    token = create_access_token(student.email)
-    return TokenResponse(access_token=token, expires_in_minutes=120, student=student)
+    service.log_security_event(client_ip, 'login_success', student.email, 'User authenticated successfully')
+    timeout_minutes = platform_settings.session_timeout_minutes
+    token = create_access_token(student.email, timedelta(minutes=timeout_minutes))
+    return TokenResponse(access_token=token, expires_in_minutes=timeout_minutes, student=student)
 
 
 @router.get('/me', response_model=StudentRead)

@@ -1,5 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -33,8 +34,10 @@ class StudentBase(BaseModel):
 
 class StudentRead(StudentBase):
     id: int
+    user_id: int
     is_active: bool
     is_admin: bool
+    last_login: Optional[datetime] = None
     major: Optional[MajorRead] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -62,4 +65,3 @@ class SkillCreate(SkillBase):
 class SkillRead(SkillBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
-

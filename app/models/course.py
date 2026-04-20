@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -17,6 +17,7 @@ class Course(TimestampMixin, Base):
 
     major = relationship('Major', back_populates='courses')
     enrollments = relationship('StudentCourse', back_populates='course', cascade='all, delete-orphan')
+    offerings = relationship('CourseOffering', back_populates='course', cascade='all, delete-orphan')
 
 
 class CoursePrerequisite(TimestampMixin, Base):
@@ -62,3 +63,16 @@ class SavedCourse(TimestampMixin, Base):
     source = Column(String(80), default='custom', nullable=False)
 
     student = relationship('Student', back_populates='saved_courses')
+
+
+class CourseOffering(TimestampMixin, Base):
+    __tablename__ = 'course_offerings'
+    __table_args__ = (UniqueConstraint('course_id', 'semester', 'academic_year', name='uq_course_offering'),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False, index=True)
+    semester = Column(String(20), nullable=False, index=True)
+    academic_year = Column(String(20), nullable=True, index=True)
+    is_open = Column(Boolean, nullable=False, default=True)
+
+    course = relationship('Course', back_populates='offerings')

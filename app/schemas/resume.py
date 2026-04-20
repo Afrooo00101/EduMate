@@ -49,10 +49,22 @@ class ResumePreviewResponse(BaseModel):
     template_name: str
 
 
+class ATSScoreBreakdown(BaseModel):
+    skills: int
+    experience: int
+    education: int
+    summary: int
+    contact: int
+
+
 class ATSCheckResponse(BaseModel):
     score: int
+    grade: str
     strengths: list[str]
     missing_keywords: list[str]
+    detected_skills: list[str]
+    recommendations: list[str]
+    breakdown: ATSScoreBreakdown
 
 
 class RecommendationCreate(BaseModel):

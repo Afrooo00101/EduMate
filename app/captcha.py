@@ -6,11 +6,11 @@ settings = get_settings()
 
 
 async def verify_captcha(token: str, client_ip: str | None = None) -> bool:
+    if settings.allow_test_captcha and not settings.recaptcha_secret_key:
+        return True
     if not token:
         return False
     if settings.allow_test_captcha and token == 'test-pass':
-        return True
-    if settings.allow_test_captcha and not settings.recaptcha_secret_key:
         return True
     if not settings.recaptcha_secret_key:
         return False
