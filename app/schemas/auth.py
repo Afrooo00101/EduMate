@@ -32,3 +32,20 @@ class TokenResponse(BaseModel):
     token_type: str = 'bearer'
     expires_in_minutes: int
     student: StudentRead
+
+
+class SocialLoginRequest(BaseModel):
+    email: EmailStr
+    full_name: str | None = Field(default=None, min_length=2, max_length=150)
+    provider: str = Field(min_length=2, max_length=50)
+    provider_uid: str | None = Field(default=None, max_length=255)
+    profile_image_url: str | None = None
+    id_token: str | None = None
+
+    @field_validator('email')
+    @classmethod
+    def validate_social_email(cls, value: EmailStr) -> str:
+        normalized = str(value).strip().lower()
+        if not normalized.endswith('@sut.edu.eg'):
+            raise ValueError('email must end with @sut.edu.eg')
+        return normalized

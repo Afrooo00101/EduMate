@@ -162,17 +162,17 @@ INTERNSHIPS = [
 ]
 
 ACCOUNT_USERS = [
-    {'student_code': 'ADM001', 'full_name': 'Lina Hassan', 'password': 'Admin@12345', 'major': 'Business Information Systems', 'gpa': 3.95, 'skills_summary': 'Leadership, operations, analytics, governance', 'profile_image_url': 'https://i.pravatar.cc/150?img=32', 'role': 'admin'},
-    {'student_code': '230145612', 'full_name': 'Mohamed Ahmed', 'password': 'EduMate@123', 'major': 'Cyber Security', 'gpa': 3.42, 'skills_summary': 'Python, Linux, SIEM, network security', 'profile_image_url': 'https://i.pravatar.cc/150?img=12', 'role': 'student'},
-    {'student_code': '230245613', 'full_name': 'Salma Nabil', 'password': 'EduMate@123', 'major': 'Computer Science', 'gpa': 3.68, 'skills_summary': 'Python, FastAPI, SQL, React', 'profile_image_url': 'https://i.pravatar.cc/150?img=47', 'role': 'student'},
-    {'student_code': '230345614', 'full_name': 'Youssef Tarek', 'password': 'EduMate@123', 'major': 'Data Science', 'gpa': 3.51, 'skills_summary': 'SQL, pandas, visualization, machine learning', 'profile_image_url': 'https://i.pravatar.cc/150?img=15', 'role': 'student'},
-    {'student_code': '240145615', 'full_name': 'Nour Ali', 'password': 'EduMate@123', 'major': 'Cyber Security', 'gpa': 3.34, 'skills_summary': 'Cloud security, IAM, Python, SOC workflows', 'profile_image_url': 'https://i.pravatar.cc/150?img=25', 'role': 'student'},
-    {'student_code': '240245616', 'full_name': 'Omar Khaled', 'password': 'EduMate@123', 'major': 'Business Information Systems', 'gpa': 3.12, 'skills_summary': 'Product analytics, dashboards, business analysis', 'profile_image_url': 'https://i.pravatar.cc/150?img=61', 'role': 'student'},
-    {'student_code': '240345617', 'full_name': 'Huda Samir', 'password': 'EduMate@123', 'major': 'Computer Science', 'gpa': 3.74, 'skills_summary': 'UI design, JavaScript, React, design systems', 'profile_image_url': 'https://i.pravatar.cc/150?img=49', 'role': 'student'},
-    {'student_code': '250145618', 'full_name': 'Karim Essam', 'password': 'EduMate@123', 'major': 'Data Science', 'gpa': 3.21, 'skills_summary': 'SQL, Power BI, dashboards, ETL', 'profile_image_url': 'https://i.pravatar.cc/150?img=52', 'role': 'student'},
-    {'student_code': '250245619', 'full_name': 'Farah Adel', 'password': 'EduMate@123', 'major': 'Computer Science', 'gpa': 3.83, 'skills_summary': 'JavaScript, UI systems, frontend testing', 'profile_image_url': 'https://i.pravatar.cc/150?img=45', 'role': 'student'},
-    {'student_code': '250345620', 'full_name': 'Ziad Mostafa', 'password': 'EduMate@123', 'major': 'Cyber Security', 'gpa': 2.97, 'skills_summary': 'Networks, SOC analysis, Linux basics', 'profile_image_url': 'https://i.pravatar.cc/150?img=14', 'role': 'student'},
-    {'student_code': '250445621', 'full_name': 'Rana Magdy', 'password': 'EduMate@123', 'major': 'Business Information Systems', 'gpa': 3.47, 'skills_summary': 'Business analysis, product metrics, presentations', 'profile_image_url': 'https://i.pravatar.cc/150?img=41', 'role': 'student'},
+    {'student_code': 'ADM001', 'full_name': 'Lina Hassan', 'password': 'Admin@12345', 'major': 'Business Information Systems', 'gpa': 3.95, 'skills_summary': 'Leadership, operations, analytics, governance', 'profile_image_url': None, 'role': 'admin'},
+    {'student_code': '230145612', 'full_name': 'Mohamed Ahmed', 'password': 'EduMate@123', 'major': 'Cyber Security', 'gpa': 3.42, 'skills_summary': 'Python, Linux, SIEM, network security', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '230245613', 'full_name': 'Salma Nabil', 'password': 'EduMate@123', 'major': 'Computer Science', 'gpa': 3.68, 'skills_summary': 'Python, FastAPI, SQL, React', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '230345614', 'full_name': 'Youssef Tarek', 'password': 'EduMate@123', 'major': 'Data Science', 'gpa': 3.51, 'skills_summary': 'SQL, pandas, visualization, machine learning', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '240145615', 'full_name': 'Nour Ali', 'password': 'EduMate@123', 'major': 'Cyber Security', 'gpa': 3.34, 'skills_summary': 'Cloud security, IAM, Python, SOC workflows', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '240245616', 'full_name': 'Omar Khaled', 'password': 'EduMate@123', 'major': 'Business Information Systems', 'gpa': 3.12, 'skills_summary': 'Product analytics, dashboards, business analysis', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '240345617', 'full_name': 'Huda Samir', 'password': 'EduMate@123', 'major': 'Computer Science', 'gpa': 3.74, 'skills_summary': 'UI design, JavaScript, React, design systems', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '250145618', 'full_name': 'Karim Essam', 'password': 'EduMate@123', 'major': 'Data Science', 'gpa': 3.21, 'skills_summary': 'SQL, Power BI, dashboards, ETL', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '250245619', 'full_name': 'Farah Adel', 'password': 'EduMate@123', 'major': 'Computer Science', 'gpa': 3.83, 'skills_summary': 'JavaScript, UI systems, frontend testing', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '250345620', 'full_name': 'Ziad Mostafa', 'password': 'EduMate@123', 'major': 'Cyber Security', 'gpa': 2.97, 'skills_summary': 'Networks, SOC analysis, Linux basics', 'profile_image_url': None, 'role': 'student'},
+    {'student_code': '250445621', 'full_name': 'Rana Magdy', 'password': 'EduMate@123', 'major': 'Business Information Systems', 'gpa': 3.47, 'skills_summary': 'Business analysis, product metrics, presentations', 'profile_image_url': None, 'role': 'student'},
 ]
 
 SUT_EMAIL_DOMAIN = 'sut.edu.eg'

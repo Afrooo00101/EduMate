@@ -7,7 +7,7 @@ from app.captcha import verify_captcha
 from app.core.dependencies import InMemoryAttemptLimiter, get_client_ip
 from app.core.security import create_access_token, get_current_student
 from app.database import get_db
-from app.schemas import APIMessage, LoginRequest, RegisterRequest, StudentRead, TokenResponse
+from app.schemas import APIMessage, LoginRequest, RegisterRequest, SocialLoginRequest, StudentRead, TokenResponse
 from app.services.admin_settings_service import get_platform_settings, is_country_blocked, is_ip_blocked
 from app.services.auth_service import AuthService
 from app.utils.helpers import SuspiciousInputError, sanitize_model
@@ -74,6 +74,41 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
 
     login_limiter.reset(client_ip)
     service.log_security_event(client_ip, 'login_success', student.email, 'User authenticated successfully')
+    timeout_minutes = platform_settings.session_timeout_minutes
+    token = create_access_token(student.email, timedelta(minutes=timeout_minutes))
+    return TokenResponse(access_token=token, expires_in_minutes=timeout_minutes, student=student)
+
+
+@router.post('/social-login', response_model=TokenResponse)
+async def social_login(payload: SocialLoginRequest, request: Request, db: Session = Depends(get_db)):
+    client_ip = get_client_ip(request)
+    service = AuthService(db)
+    platform_settings = get_platform_settings(db)
+
+    if is_ip_blocked(db, client_ip):
+        service.log_security_event(client_ip, 'blocked_ip', payload.email, 'Social login blocked by IP rule')
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Access denied from this IP address')
+
+    if is_country_blocked(db, request):
+        service.log_security_event(client_ip, 'blocked_country', payload.email, 'Social login blocked by country access rule')
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Access denied from this region')
+
+    try:
+        payload = sanitize_model(payload)
+    except SuspiciousInputError:
+        service.log_security_event(client_ip, 'xss_rejected', payload.email, 'Forbidden script content detected during social login')
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Input rejected, login failed')
+
+    try:
+        student = service.authenticate_social(payload)
+    except ValueError as exc:
+        service.log_security_event(client_ip, 'social_login_failed', payload.email, str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if platform_settings.maintenance_mode and not student.is_admin:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Platform is currently in maintenance mode')
+
+    service.log_security_event(client_ip, 'social_login_success', student.email, f'Social login via {payload.provider}')
     timeout_minutes = platform_settings.session_timeout_minutes
     token = create_access_token(student.email, timedelta(minutes=timeout_minutes))
     return TokenResponse(access_token=token, expires_in_minutes=timeout_minutes, student=student)

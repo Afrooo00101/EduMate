@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -42,7 +43,7 @@ class Student(TimestampMixin, Base):
     major_id = Column(Integer, ForeignKey('majors.id', ondelete='SET NULL'))
     graduation_year = Column(Integer)
     skills_summary = Column(Text)
-    profile_image_url = Column(String(500))
+    profile_image_url = Column(MEDIUMTEXT)
 
     user = relationship('User', back_populates='student')
     major = relationship('Major', back_populates='students')
