@@ -2,7 +2,19 @@
     const API_BASE = window.__EDUMATE_API_BASE__ || 'http://127.0.0.1:8000/api/v1';
     const TOKEN_KEY = 'edumate_access_token';
     const USER_KEY = 'edumate_current_user';
-    const DEFAULT_AVATAR = 'https://via.placeholder.com/110/2563eb/FFFFFF?text=U';
+    const DEFAULT_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="110" height="110" viewBox="0 0 110 110">
+            <defs>
+                <linearGradient id="avatarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#2563eb" />
+                    <stop offset="100%" stop-color="#1d4ed8" />
+                </linearGradient>
+            </defs>
+            <rect width="110" height="110" rx="55" fill="url(#avatarGradient)" />
+            <circle cx="55" cy="42" r="18" fill="#ffffff" opacity="0.95" />
+            <path d="M26 92c4-16 17-26 29-26s25 10 29 26" fill="#ffffff" opacity="0.95" />
+        </svg>`
+    )}`;
     const DEV_CAPTCHA_TOKEN = 'test-pass';
 
     const legacySearchCourses = typeof window.searchCourses === 'function' ? window.searchCourses : null;
@@ -84,6 +96,67 @@
         alert(friendlyMessage);
     }
 
+    function getAvatarCacheKey(user) {
+        const identity = user?.student_code || user?.email || 'guest';
+        return `edumate_avatar_cache_${identity}`;
+    }
+
+    function buildInitialsAvatar(name) {
+        const source = String(name || 'User').trim();
+        const parts = source.split(/\s+/).filter(Boolean);
+        const initials = (parts[0]?.[0] || 'U') + (parts[1]?.[0] || '');
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="110" height="110" viewBox="0 0 110 110">
+                <defs>
+                    <linearGradient id="avatarInitialsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#0f766e" />
+                        <stop offset="100%" stop-color="#0ea5e9" />
+                    </linearGradient>
+                </defs>
+                <rect width="110" height="110" rx="55" fill="url(#avatarInitialsGradient)" />
+                <text x="55" y="63" text-anchor="middle" font-size="34" font-family="Inter, Arial, sans-serif" font-weight="700" fill="#ffffff">${initials.toUpperCase()}</text>
+            </svg>`
+        )}`;
+    }
+
+    function getCachedAvatar(user) {
+        if (!user) return '';
+        try {
+            return localStorage.getItem(getAvatarCacheKey(user)) || '';
+        } catch (_error) {
+            return '';
+        }
+    }
+
+    function cacheAvatarForUser(user, value) {
+        if (!user) return;
+        const src = String(value || '').trim();
+        if (!src || src === DEFAULT_AVATAR) return;
+        try {
+            localStorage.setItem(getAvatarCacheKey(user), src);
+        } catch (_error) {}
+    }
+
+    function normalizeAvatarUrl(value) {
+        const src = String(value || '').trim();
+        return src || DEFAULT_AVATAR;
+    }
+
+    function getPreferredAvatar(user, overrideValue) {
+        const cached = getCachedAvatar(user);
+        const direct = String(overrideValue || user?.profile_image_url || '').trim();
+        return cached || direct || buildInitialsAvatar(user?.full_name);
+    }
+
+    function applyAvatarSource(imageElement, value, user) {
+        if (!imageElement) return;
+        imageElement.onerror = function () {
+            imageElement.onerror = null;
+            imageElement.src = buildInitialsAvatar(user?.full_name);
+        };
+        imageElement.src = normalizeAvatarUrl(value || getPreferredAvatar(user));
+    }
+
     function getToken() {
         return sessionStorage.getItem(TOKEN_KEY) || '';
     }
@@ -142,6 +215,7 @@
         if (token) {
             sessionStorage.setItem(TOKEN_KEY, token);
         }
+        cacheAvatarForUser(student, student?.profile_image_url);
         sessionStorage.setItem(USER_KEY, JSON.stringify(student));
         syncLegacyUser(student);
     }
@@ -454,8 +528,90 @@
         }
     }
 
+    async function performSocialLogin(socialProfile) {
+        const email = String(socialProfile?.email || '').trim().toLowerCase();
+        if (!email.endsWith('@sut.edu.eg')) {
+            throw new Error('Only @sut.edu.eg email addresses are allowed');
+        }
+        const data = await apiFetch('/auth/social-login', {
+            method: 'POST',
+            auth: false,
+            body: JSON.stringify({
+                email,
+                full_name: String(socialProfile?.name || '').trim() || null,
+                provider: String(socialProfile?.provider || 'social').trim().toLowerCase(),
+                provider_uid: String(socialProfile?.providerUid || socialProfile?.uid || '').trim() || null,
+                profile_image_url: String(socialProfile?.picture || '').trim() || null,
+                id_token: String(socialProfile?.idToken || '').trim() || null,
+            }),
+        });
+
+        setSession(data.student, data.access_token);
+        if (typeof window.updateSidebarFromStorage === 'function') window.updateSidebarFromStorage();
+        if (typeof window.applyStoredProfileToUI === 'function') window.applyStoredProfileToUI();
+        if (typeof window.logActivity === 'function') {
+            window.logActivity('social_signed_in', `Signed in with ${socialProfile?.provider || 'social login'}`);
+        }
+        return data.student;
+    }
+
+    async function firebaseSocialLogin(providerType) {
+        if (typeof firebase === 'undefined' || !firebase.auth) {
+            throw new Error('Social login is not available right now');
+        }
+
+        let provider;
+        if (providerType === 'google') {
+            provider = new firebase.auth.GoogleAuthProvider();
+        } else if (providerType === 'github') {
+            provider = new firebase.auth.GithubAuthProvider();
+        } else if (providerType === 'microsoft') {
+            provider = new firebase.auth.OAuthProvider('microsoft.com');
+        } else {
+            throw new Error('Unsupported social provider');
+        }
+
+        const result = await firebase.auth().signInWithPopup(provider);
+        const socialUser = result.user;
+        const idToken = socialUser ? await socialUser.getIdToken() : '';
+        return performSocialLogin({
+            email: socialUser?.email || '',
+            name: socialUser?.displayName || '',
+            picture: socialUser?.photoURL || '',
+            provider: providerType,
+            providerUid: socialUser?.uid || '',
+            idToken,
+        });
+    }
+
     window.handleLogin = function () { return handleBackendLogin('index-page'); };
     window.attemptLogin = function () { return handleBackendLogin('home-page'); };
+    window.handleSocialLogin = async function (providerType) {
+        try {
+            const student = await firebaseSocialLogin(providerType);
+            notify('Login successful', 'success');
+            window.location.href = student.is_admin ? 'admin.html' : 'home.html';
+            return student;
+        } catch (error) {
+            notify(error.message || 'Social login failed', 'error');
+            try {
+                if (typeof firebase !== 'undefined' && firebase.auth) await firebase.auth().signOut();
+            } catch (_error) {}
+            return null;
+        }
+    };
+    window.firebaseLogin = async function (providerType) {
+        try {
+            await firebaseSocialLogin(providerType);
+            notify('Login successful', 'success');
+            if (typeof window.navigateTo === 'function') window.navigateTo('dashboard');
+        } catch (error) {
+            notify(error.message || 'Social login failed', 'error');
+            try {
+                if (typeof firebase !== 'undefined' && firebase.auth) await firebase.auth().signOut();
+            } catch (_error) {}
+        }
+    };
 
     window.checkSession = function () {
         const token = getToken();
@@ -534,7 +690,7 @@
         const profileName = document.getElementById('profile-name');
         const profilePic = document.getElementById('profile-pic');
         if (profileName) profileName.textContent = user ? user.full_name : 'Guest';
-        if (profilePic) profilePic.src = user?.profile_image_url || DEFAULT_AVATAR;
+        applyAvatarSource(profilePic, getPreferredAvatar(user), user);
         const userName = document.getElementById('user-name');
         if (userName && user) userName.textContent = user.full_name || user.student_code;
     };
@@ -543,7 +699,7 @@
         const user = getStoredUser();
         if (!user) return;
         const avatar = document.getElementById('profile-avatar-large');
-        if (avatar) avatar.src = user.profile_image_url || DEFAULT_AVATAR;
+        applyAvatarSource(avatar, getPreferredAvatar(user), user);
         const mappings = {
             'profile-name-input': user.full_name,
             'profile-username-input': user.student_code,
@@ -576,10 +732,13 @@
         const majorName = String(document.getElementById('profile-major-input')?.value || getMajorLabel(currentUser) || '').trim();
         const graduationYearValue = String(document.getElementById('profile-gradyear-input')?.value || currentUser.graduation_year || '').trim();
         const skillsSummary = String(document.getElementById('profile-skills-input')?.value || currentUser.skills_summary || '').trim();
-        const avatarUrl = document.getElementById('profile-avatar-large')?.src || currentUser.profile_image_url || DEFAULT_AVATAR;
+        const avatarUrl = normalizeAvatarUrl(
+            document.getElementById('profile-avatar-large')?.src || getPreferredAvatar(currentUser)
+        );
 
         try {
             const majorId = await resolveMajorId(majorName);
+            cacheAvatarForUser(currentUser, avatarUrl);
             const updated = await apiFetch('/users/me', {
                 method: 'PUT',
                 body: JSON.stringify({
@@ -600,6 +759,10 @@
             notify(error.message || 'Failed to save profile', 'error');
         }
     };
+
+    window.applyAvatarSource = applyAvatarSource;
+    window.getPreferredAvatar = getPreferredAvatar;
+    window.DEFAULT_AVATAR = DEFAULT_AVATAR;
 
     window.sendAIChatMessage = async function () {
         const input = document.getElementById('ai-chat-input');

@@ -722,8 +722,17 @@ function applyStoredProfileToUI() {
 function changeProfileAvatar(input) {
     if (!input.files || !input.files[0]) return;
     const reader = new FileReader();
-    reader.onload = e => { 
-        document.getElementById('profile-avatar-large').src = e.target.result; 
+    reader.onload = e => {
+        const avatarUrl = e.target.result;
+        const profileAvatar = document.getElementById('profile-avatar-large');
+        const sidebarAvatar = document.getElementById('profile-pic');
+        if (typeof window.applyAvatarSource === 'function') {
+            window.applyAvatarSource(profileAvatar, avatarUrl);
+            window.applyAvatarSource(sidebarAvatar, avatarUrl);
+            return;
+        }
+        if (profileAvatar) profileAvatar.src = avatarUrl;
+        if (sidebarAvatar) sidebarAvatar.src = avatarUrl;
     };
     reader.readAsDataURL(input.files[0]);
 }
