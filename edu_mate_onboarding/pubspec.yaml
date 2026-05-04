@@ -1,0 +1,54 @@
+name: edu_mate_onboarding
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.4
+
+dependencies:
+  web: ^1.1.0
+  dio: ^5.4.0
+  http: ^1.2.0
+  url_launcher: ^6.2.0
+  logger: ^2.0.0
+  go_router: ^17.2.2
+  flutter:
+    sdk: flutter
+
+  flutter_localizations:
+    sdk: flutter
+
+  firebase_core: ^3.1.1
+  cloud_firestore: ^5.0.2
+  firebase_auth: ^5.1.1
+  firebase_storage: ^12.0.1
+  
+  # UI
+  flutter_svg: ^2.0.7
+  google_fonts: ^8.1.0
+#  google_sign_in: ^7.2.0
+  flutter_launcher_icons: ^0.14.4
+  iconsax: ^0.0.8
+  
+  # State Management
+  provider: ^6.0.5
+  
+  # Storage
+  shared_preferences: ^2.2.0
+  
+  # HTTP Client
+  # http is removed in favor of dio
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
