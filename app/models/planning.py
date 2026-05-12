@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, UniqueConstraint, Numeric
+from sqlalchemy.dialects.mysql import INTEGER, DECIMAL
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -26,10 +27,10 @@ class AcademicRule(TimestampMixin, Base):
     __tablename__ = 'academic_rules'
     __table_args__ = (UniqueConstraint('semester_type', 'min_gpa', 'max_gpa', name='uq_academic_rules_range'),)
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=True)
     semester_type = Column(String(20), nullable=False, index=True)
-    min_gpa = Column(Numeric(3, 2), nullable=False)
-    max_gpa = Column(Numeric(3, 2), nullable=False)
+    min_gpa = Column(DECIMAL(3, 2), nullable=False)
+    max_gpa = Column(DECIMAL(3, 2), nullable=False)
     max_credits = Column(Integer, nullable=False)
 
 
@@ -47,3 +48,25 @@ class StudyPlan(TimestampMixin, Base):
 
     major = relationship('Major')
     course = relationship('Course')
+
+
+class Request(TimestampMixin, Base):
+    __tablename__ = 'requests'
+
+    id = Column(Integer, primary_key=True, index=True)
+    student = Column(String(100), nullable=False)
+    course = Column(String(150), nullable=False)
+    status = Column(String(50), nullable=False, default="Pending")
+    reason = Column(Text, nullable=True)
+
+
+class AdvisorMessage(TimestampMixin, Base):
+    __tablename__ = 'advisor_messages'
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'), nullable=False, index=True)
+    sender_role = Column(String(20), nullable=False)  # 'student' or 'admin'
+    content = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+
+    student = relationship('Student', back_populates='advisor_messages')

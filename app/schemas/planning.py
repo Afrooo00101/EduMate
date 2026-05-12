@@ -1,6 +1,7 @@
-﻿from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
-from app.schemas.course import StudentCourseRead
+from app.schemas.course import StudentCourseRead, StudentCourseUpsert
+from app.schemas.schemas import CareerPathTimeline, SemesterSummary, GPACalculation
 
 
 class PlanningOverview(BaseModel):
@@ -31,3 +32,27 @@ class GPASummary(BaseModel):
     cumulative_gpa: float
     total_graded_courses: int
     distribution: dict[str, int]
+
+
+class SummerRequestRead(BaseModel):
+    id: int
+    course: str
+    status: str
+    reason: str | None
+    created_at: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AdvisorMessageBase(BaseModel):
+    content: str
+
+
+class AdvisorMessageCreate(AdvisorMessageBase):
+    pass
+
+
+class AdvisorMessageRead(AdvisorMessageBase):
+    id: int
+    sender_role: str
+    created_at: str | None = None
+    model_config = ConfigDict(from_attributes=True)

@@ -1,6 +1,8 @@
 import json
 from functools import lru_cache
+from pathlib import Path
 from typing import List
+
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,7 +21,12 @@ class Settings(BaseSettings):
     cors_origins: List[str] = Field(default_factory=lambda: ['null', 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5500', 'http://127.0.0.1:5500', 'http://localhost:5501', 'http://127.0.0.1:5501'])
     cors_origin_regex: str = r'^null$|^https?://(localhost|127\.0\.0\.1)(:\d+)?$'
 
-    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).resolve().parent.parent / '.env'),
+        env_file_encoding='utf-8',
+        extra='ignore'
+    )
+
 
     @field_validator('cors_origins', mode='before')
     @classmethod

@@ -1,5 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
-from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from sqlalchemy.dialects.mysql import INTEGER, DECIMAL
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -9,8 +9,8 @@ from app.models.base import TimestampMixin
 class Major(TimestampMixin, Base):
     __tablename__ = 'majors'
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(150), nullable=False, unique=True, index=True)
+    id = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=True)
+    name = Column(String(150), nullable=False, unique=True)
     department = Column(String(150), nullable=False)
     description = Column(Text)
 
@@ -21,10 +21,10 @@ class Major(TimestampMixin, Base):
 class User(TimestampMixin, Base):
     __tablename__ = 'users'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=True)
     name = Column(String(150), nullable=False)
-    email = Column(String(255), nullable=False, unique=True, index=True)
-    role = Column(String(20), nullable=False, default='student', index=True)
+    email = Column(String(255), nullable=False, unique=True)
+    role = Column(String(20), nullable=False, default='student')
     password_hash = Column(String(255), nullable=False)
     remember_token = Column(String(255), nullable=True)
     last_login = Column(DateTime, nullable=True)
@@ -36,14 +36,14 @@ class User(TimestampMixin, Base):
 class Student(TimestampMixin, Base):
     __tablename__ = 'students'
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, unique=True, index=True)
-    student_code = Column(String(50), nullable=False, unique=True, index=True)
-    gpa = Column(Float, default=0.0)
-    major_id = Column(Integer, ForeignKey('majors.id', ondelete='SET NULL'))
+    id = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=True)
+    user_id = Column(INTEGER(unsigned=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False, unique=True)
+    student_code = Column(String(50), nullable=False, unique=True)
+    gpa = Column(DECIMAL(3, 2), default=0.0)
+    major_id = Column(INTEGER(unsigned=True), ForeignKey('majors.id', ondelete='SET NULL'))
     graduation_year = Column(Integer)
     skills_summary = Column(Text)
-    profile_image_url = Column(MEDIUMTEXT)
+    profile_image_url = Column(Text)
 
     user = relationship('User', back_populates='student')
     major = relationship('Major', back_populates='students')
@@ -58,6 +58,7 @@ class Student(TimestampMixin, Base):
     analytics_events = relationship('AnalyticsEvent', back_populates='student', cascade='all, delete-orphan')
     activity_logs = relationship('ActivityLog', back_populates='student', cascade='all, delete-orphan')
     ai_chat_messages = relationship('AIChatMessage', back_populates='student', cascade='all, delete-orphan')
+    advisor_messages = relationship('AdvisorMessage', back_populates='student', cascade='all, delete-orphan')
     planner_state = relationship('PlannerState', back_populates='student', uselist=False, cascade='all, delete-orphan')
 
     @property
