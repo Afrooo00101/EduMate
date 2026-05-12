@@ -1,5 +1,5 @@
-﻿(function () {
-    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://127.0.0.1:8000/api/v1';
+(function () {
+    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://localhost:8000/api/v1';
     const TOKEN_KEY = 'edumate_access_token';
     const USER_KEY = 'edumate_current_user';
     const DEFAULT_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(

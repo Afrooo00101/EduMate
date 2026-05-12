@@ -1,4 +1,4 @@
-﻿// Firebase Configuration
+// Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyDoZebcPthz70oxICYAMm4W43JGXVUkTZE",
     authDomain: "edumate-8b4c3.firebaseapp.com",
@@ -298,7 +298,7 @@ if (savedTheme === 'dark') {
 }
 
 // Export for global use
-window.handleLogin = handleLogin;
+// window.handleLogin = handleLogin;
 window.handleSocialLogin = handleSocialLogin;
 window.handleForgotPassword = handleForgotPassword;
 window.toggleTheme = toggleTheme;

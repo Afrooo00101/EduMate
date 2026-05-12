@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -41,6 +41,8 @@
             <a href="#" onclick="navigateTo('users')">Users</a>
             <a href="#" onclick="navigateTo('analytics')">Analytics</a>
             <a href="#" onclick="navigateTo('security')">Security</a>
+            <a href="#" onclick="navigateTo('requests')">Requests</a>
+            <a href="#" onclick="navigateTo('ai_chats')">AI Chats</a>
             <a href="#" onclick="navigateTo('logs')">System Logs</a>
             <!-- <a href="#" onclick="navigateTo('settings')">settings</a> -->
         </nav>
@@ -493,6 +495,55 @@
                 <div id="system-logs" style="max-height:500px; overflow-y:auto; font-family:monospace; font-size:0.85rem;">
                     <!-- System logs will be loaded here -->
                 </div>
+            </div>
+        </section>
+
+        <!-- Requests Page -->
+        <section id="requests" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Course & Summer Requests</h2>
+                <button class="btn" style="padding:10px 16px;" onclick="loadRequestsData()">Refresh</button>
+            </div>
+            
+            <div class="card" style="padding:15px; overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse; font-size:0.9rem;">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border)">
+                            <th style="text-align:left;padding:8px">Student</th>
+                            <th style="text-align:left;padding:8px">Course</th>
+                            <th style="text-align:left;padding:8px">Date</th>
+                            <th style="text-align:left;padding:8px">Status</th>
+                            <th style="text-align:left;padding:8px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="requests-table-body">
+                        <!-- Requests will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- AI Chats Page -->
+        <section id="ai_chats" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">AI Advisor Chats</h2>
+                <button class="btn" style="padding:10px 16px;" onclick="loadAiChatsData()">Refresh</button>
+            </div>
+            
+            <div class="card" style="padding:15px; overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse; font-size:0.9rem;">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border)">
+                            <th style="text-align:left;padding:8px;width:15%">Student ID</th>
+                            <th style="text-align:left;padding:8px;width:35%">User Message</th>
+                            <th style="text-align:left;padding:8px;width:35%">AI Response</th>
+                            <th style="text-align:left;padding:8px;width:15%">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ai-chats-table-body">
+                        <!-- AI Chats will be loaded here -->
+                    </tbody>
+                </table>
             </div>
         </section>
 

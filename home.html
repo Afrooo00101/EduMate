@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -57,7 +57,7 @@
     </header>
 
     <!-- Sidebar -->
-    <!-- <nav id="sidebar" class="sidebar">
+    <nav id="sidebar" class="sidebar">
         <div class="sidebar-profile" onclick="navigateTo('profile')">
             <img id="profile-pic" class="profile-pic" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F036%2F885%2F313%2Foriginal%2Fblue-profile-icon-free-png.png&f=1&nofb=1&ipt=835f4c686ca5c7c40c36d1d27d110a772754ba33d4d707b84606d4cf250ecde1">
             <div>
@@ -79,7 +79,7 @@
         <div class="nav-item" onclick="navigateTo('xai')">
             <span>🤖</span> <span class="nav-item-text">AI Chat</span>
         </div>
-    </nav> -->
+    </nav>
 
     <!-- Main Content -->
     <main id="mainContent" class="main-content">
@@ -621,589 +621,374 @@
             </div>
         </section>
 
-        <!-- ===== ENHANCED PLANNING PAGE ===== -->
-    <section id="planning" class="page">
-        <div class="planner-container">
-            <!-- Top header with career path -->
-            <div class="hero-row">
-                <div class="greet">
-                    <i class="fas fa-compass"></i>
-                    <h1>EduPath · planning your path</h1>
+    <!-- ===== ENHANCED PLANNING PAGE ===== -->
+        <section id="planning" class="page">
+            <div class="planner-container">
+                <!-- Top header with career path -->
+                <div class="hero-row">
+                    <div class="greet">
+                        <i class="fas fa-compass"></i>
+                        <h1>EduPath · planning your path</h1>
+                    </div>
+                    <div class="career-tag">
+                        <span><i class="fas fa-route" style="margin-right: 6px;"></i> current path</span>
+                        <div class="career-badge" id="career-badge-display">🛡️ Cyber Security</div>
+                    </div>
                 </div>
-                <div class="career-tag">
-                    <span><i class="fas fa-route" style="margin-right: 6px;"></i> current path</span>
-                    <div class="career-badge">🛡️ Cyber Security</div>
-                </div>
-            </div>
 
-            <!-- Stats snapshot -->
-            <div class="stats-row">
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-book-open"></i></div>
-                    <div class="stat-content">
-                        <h3 id="total-credits">128</h3>
-                        <p>total credits</p>
-                    </div>
+                <!-- Plan / Preview Toggle -->
+                <div class="plan-toggle-bar">
+                    <button class="toggle-btn active" onclick="switchPlanningView('plan')">
+                        <i class="fas fa-edit"></i> Plan Semesters
+                    </button>
+                    <button class="toggle-btn" onclick="switchPlanningView('preview')">
+                        <i class="fas fa-road"></i> Career Path Preview
+                    </button>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                    <div class="stat-content">
-                        <h3 id="earned-credits">86</h3>
-                        <p>earned</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-clock"></i></div>
-                    <div class="stat-content">
-                        <h3 id="remaining-credits">80</h3>
-                        <p>to go</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-star"></i></div>
-                    <div class="stat-content">
-                        <h3 id="current-gpa">3.2</h3>
-                        <p>current GPA</p>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Main planning grid -->
-            <div class="plan-grid">
-                <!-- Left side – semesters with credit hours -->
-                <div class="semester-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-layer-group"></i> academic semesters</h2>
-                        <div class="add-btn" id="add-semester-btn"><i class="fas fa-plus-circle"></i> add semester</div>
+                <!-- Stats snapshot -->
+                <div class="stats-row" id="planning-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-book-open"></i></div>
+                        <div class="stat-content">
+                            <h3 id="total-credits">128</h3>
+                            <p>total credits</p>
+                        </div>
                     </div>
-                    
-                    <!-- Semester Subjects Modal/Popup -->
-                    <div id="semester-subjects-modal" class="subjects-modal">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h2><i class="fas fa-book-open"></i> Choose Semester Subjects</h2>
-                                <button onclick="closeSubjectModal()" class="modal-close">&times;</button>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-content">
+                            <h3 id="earned-credits">86</h3>
+                            <p>earned</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                        <div class="stat-content">
+                            <h3 id="remaining-credits">80</h3>
+                            <p>to go</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-star"></i></div>
+                        <div class="stat-content">
+                            <h3 id="current-gpa">3.2</h3>
+                            <p>current GPA</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== PLAN VIEW (Semester Planning) ========== -->
+                <div id="planning-plan-view" class="planning-view active">
+                    <!-- Main planning grid -->
+                    <div class="plan-grid">
+                        <!-- Left side – semesters with credit hours -->
+                        <div class="semester-section">
+                            <div class="section-header">
+                                <h2><i class="fas fa-layer-group"></i> academic semesters</h2>
+                                <div class="add-btn" id="add-semester-btn"><i class="fas fa-plus-circle"></i> add semester</div>
                             </div>
                             
-                            <div class="modal-body">
-                                <div class="form-group">
-                                    <label>Semester Type:</label>
-                                    <select id="semester-type" class="input" onchange="loadSubjectsForSemester()">
-                                        <option value="foundation">Foundation Semester</option>
-                                        <option value="core">Core & Data Semester</option>
-                                        <option value="intelligent">Intelligent Systems</option>
-                                        <option value="advanced">Advanced Topics</option>
-                                        <option value="specialization">Specialization</option>
-                                        <option value="capstone">Capstone Prep</option>
-                                        <option value="final">Final Project</option>
-                                        <option value="custom">Custom Semester</option>
-                                    </select>
-                                </div>
-                                
-                                <div id="subjects-list" class="subjects-list"></div>
-                                
-                                <div id="custom-subject-input" class="custom-subject-input">
-                                    <div class="form-group">
-                                        <label>Custom Subject Name:</label>
-                                        <input type="text" id="custom-subject-name" class="input" placeholder="e.g., Advanced Machine Learning">
+                            <!-- Semester Subjects Modal/Popup -->
+                            <div id="semester-subjects-modal" class="subjects-modal">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h2><i class="fas fa-book-open"></i> Choose Semester Subjects</h2>
+                                        <button onclick="closeSubjectModal()" class="modal-close">&times;</button>
                                     </div>
-                                    <div class="form-group">
-                                        <label>Credit Hours:</label>
-                                        <select id="custom-subject-credits" class="input">
-                                            <option value="1">1 credit</option>
-                                            <option value="2">2 credits</option>
-                                            <option value="3" selected>3 credits</option>
-                                            <option value="4">4 credits</option>
-                                            <option value="5">5 credits</option>
-                                            <option value="6">6 credits</option>
-                                        </select>
+                                    
+                                    <div class="modal-body">
+                                        <div class="form-group">
+                                            <label>Semester Type:</label>
+                                            <select id="semester-type" class="input" onchange="loadSubjectsForSemester()">
+                                                <option value="foundation">Foundation Semester</option>
+                                                <option value="core">Core & Data Semester</option>
+                                                <option value="intelligent">Intelligent Systems</option>
+                                                <option value="advanced">Advanced Topics</option>
+                                                <option value="specialization">Specialization</option>
+                                                <option value="capstone">Capstone Prep</option>
+                                                <option value="final">Final Project</option>
+                                                <option value="custom">Custom Semester</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div id="subjects-list" class="subjects-list"></div>
+                                        
+                                        <div id="custom-subject-input" class="custom-subject-input">
+                                            <div class="form-group">
+                                                <label>Custom Subject Name:</label>
+                                                <input type="text" id="custom-subject-name" class="input" placeholder="e.g., Advanced Machine Learning">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Credit Hours:</label>
+                                                <select id="custom-subject-credits" class="input">
+                                                    <option value="1">1 credit</option>
+                                                    <option value="2">2 credits</option>
+                                                    <option value="3" selected>3 credits</option>
+                                                    <option value="4">4 credits</option>
+                                                    <option value="5">5 credits</option>
+                                                    <option value="6">6 credits</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <div id="selected-subjects" class="selected-subjects">
+                                            <h4>Selected Subjects (<span id="selected-count">0</span>)</h4>
+                                            <div id="selected-subjects-list" class="selected-subjects-list"></div>
+                                        </div>
                                     </div>
-                                </div>
-                                
-                                <div id="selected-subjects" class="selected-subjects">
-                                    <h4>Selected Subjects (<span id="selected-count">0</span>)</h4>
-                                    <div id="selected-subjects-list" class="selected-subjects-list"></div>
+                                    
+                                    <div class="modal-footer">
+                                        <button onclick="closeSubjectModal()" class="link-btn">Cancel</button>
+                                        <button onclick="createSemesterWithSubjects()" class="btn">
+                                            <i class="fas fa-plus-circle"></i> Create Semester
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <div class="modal-footer">
-                                <button onclick="closeSubjectModal()" class="link-btn">Cancel</button>
-                                <button onclick="createSemesterWithSubjects()" class="btn">
-                                    <i class="fas fa-plus-circle"></i> Create Semester
-                                </button>
+                            <!-- Add Subject Modal -->
+                            <div id="add-subject-modal" class="subjects-modal">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h2><i class="fas fa-plus-circle"></i> Add Subject to Semester</h2>
+                                        <button onclick="closeAddSubjectModal()" class="modal-close">&times;</button>
+                                    </div>
+                                    
+                                    <div class="modal-body">
+                                        <div class="form-group">
+                                            <label>Subject Name:</label>
+                                            <input type="text" id="new-subject-name" class="input" placeholder="e.g., Advanced Algorithms">
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label>Credit Hours:</label>
+                                            <select id="new-subject-credits" class="input">
+                                                <option value="1">1 credit</option>
+                                                <option value="2">2 credits</option>
+                                                <option value="3" selected>3 credits</option>
+                                                <option value="4">4 credits</option>
+                                                <option value="5">5 credits</option>
+                                                <option value="6">6 credits</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="modal-footer">
+                                        <button onclick="closeAddSubjectModal()" class="link-btn">Cancel</button>
+                                        <button onclick="addSubjectToSemester()" class="btn">
+                                            <i class="fas fa-plus-circle"></i> Add Subject
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="semester-cards" id="semester-cards-container">
+                                <!-- Semester cards populated by JS -->
+                            </div>
+                            <div id="semester-counter" class="semester-counter">
+                                <i class="fas-regular fa-calendar-plus"></i> <span id="counter-text">3 semesters planned</span>
+                            </div>
+                        </div>
+
+                        <!-- Right panel – career guidance -->
+                        <div class="right-panel">
+                            <div class="path-card">
+                                <h4><i class="fas fa-map-signs"></i> career track</h4>
+                                <div class="career-name" id="career-name-display">Cyber Security</div>
+                                <div class="path-stats">
+                                    <div><i class="fas fa-briefcase"></i> <span id="courses-left">8</span> courses left</div>
+                                    <div><i class="fas fa-flask"></i> <span id="capstone-count">1</span> capstone</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Summer Course Request Section -->
+                            <div class="summer-request-section" id="summer-request-section">
+                                <div class="summer-request-header">
+                                    <h3><i class="fas fa-sun"></i> Summer Course Request</h3>
+                                    <button class="summer-request-btn" onclick="viewAllSummerCourses()">
+                                        <i class="fas fa-list"></i> View All
+                                    </button>
+                                </div>
+                                <p style="font-size:0.85rem;color:#92400e;margin-bottom:0.8rem;">
+                                    Based on your progress, consider these summer courses:
+                                </p>
+                                <div class="summer-course-list" id="summer-course-list">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <div class="academic-tip">
+                                <p><i class="fas fa-lightbulb"></i> next milestone suggestion</p>
+                                <div class="tip-desc" id="milestone-suggestion">
+                                    <strong>Loading recommendations...</strong>
+                                </div>
+                            </div>
+                            <div class="progress-block">
+                                <div class="progress-label">
+                                    <span><i class="fas fa-tasks"></i> degree progress</span>
+                                    <span id="progress-percentage">67%</span>
+                                </div>
+                                <div class="bar-bg">
+                                    <div class="bar-fill" id="progress-bar" style="width: 67%;"></div> 
+                                </div>
+                            </div>
+                            <div class="roadmap-title">roadmap preview</div>
+                            <div class="roadmap-mini" id="roadmap-mini">
+                                <!-- Populated by JS -->
+                            </div>
+                            <div class="advisor-note">
+                                <i class="fas fa-robot"></i>
+                                <div id="ai-advisor-text"><strong>AI advisor:</strong> based on your interest in NLP, consider adding 'speech processing' as elective (3cr).</div>
+                            </div>
+                            <div id="graduation-info" class="graduation-info">
+                                <div class="info-item">
+                                    <i class="fas fa-hourglass-half"></i> 
+                                    <span><strong>remaining credits:</strong> <span id="remaining-credits-display">42</span></span>
+                                </div>
+                                <div class="info-item">
+                                    <i class="fas fa-calendar-alt"></i> 
+                                    <span><strong>est. graduation:</strong> <span id="graduation-date">may '27</span></span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Add Subject Modal -->
-                    <div id="add-subject-modal" class="subjects-modal">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h2><i class="fas fa-plus-circle"></i> Add Subject to Semester</h2>
-                                <button onclick="closeAddSubjectModal()" class="modal-close">&times;</button>
-                            </div>
-                            
-                            <div class="modal-body">
-                                <div class="form-group">
-                                    <label>Subject Name:</label>
-                                    <input type="text" id="new-subject-name" class="input" placeholder="e.g., Advanced Algorithms">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Credit Hours:</label>
-                                    <select id="new-subject-credits" class="input">
-                                        <option value="1">1 credit</option>
-                                        <option value="2">2 credits</option>
-                                        <option value="3" selected>3 credits</option>
-                                        <option value="4">4 credits</option>
-                                        <option value="5">5 credits</option>
-                                        <option value="6">6 credits</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="modal-footer">
-                                <button onclick="closeAddSubjectModal()" class="link-btn">Cancel</button>
-                                <button onclick="addSubjectToSemester()" class="btn">
-                                    <i class="fas fa-plus-circle"></i> Add Subject
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="semester-cards" id="semester-cards-container">
-                        <!-- Semester 1 -->
-                        <div class="semester-item" data-semester="1">
-                            <div class="semester-head">
-                                <div class="semester-title">
-                                    <span class="sem-num">sem 1</span>
-                                    <h3 contenteditable="true">foundations</h3>
-                                </div>
-                                <div class="credit-sum">15 credits</div>
-                            </div>
-                            <div class="courses-container">
-                                <div class="course-row" data-course-id="s1c1">
-                                    <span class="course-name"><i class="fas fa-circle"></i> intro to programming</span>
-                                    <span class="course-credits" data-credits="4">4 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s1c2">
-                                    <span class="course-name"><i class="fas fa-circle"></i> Math I</span>
-                                    <span class="course-credits" data-credits="4">4 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s1c3">
-                                    <span class="course-name"><i class="fas fa-circle"></i> AutoCad</span>
-                                    <span class="course-credits" data-credits="4">4 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s1c4">
-                                    <span class="course-name"><i class="fas fa-circle"></i> English I</span>
-                                    <span class="course-credits" data-credits="3">3 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="semester-actions">
-                                <button class="add-course-btn" onclick="showAddSubjectModal(this)">
-                                    <i class="fas fa-plus-circle"></i> add subject
-                                </button>
-                                <button class="drop-course-btn" onclick="showDropSubjectsMode(this)">
-                                    <i class="fas fa-minus-circle"></i> drop subjects
+
+                    <!-- GPA Calculator Panel -->
+                    <div class="gpa-calculator-enhanced">
+                        <div class="gpa-header">
+                            <h3><i class="fas fa-calculator"></i> GPA Calculator</h3>
+                            <div class="gpa-header-actions">
+                                <button class="gpa-toggle-btn" onclick="toggleGPASection()">
+                                    <i class="fas fa-chevron-up"></i>
                                 </button>
                             </div>
                         </div>
                         
-                        <!-- Semester 2 -->
-                        <div class="semester-item" data-semester="2">
-                            <div class="semester-head">
-                                <div class="semester-title">
-                                    <span class="sem-num">sem 2</span>
-                                    <h3 contenteditable="true">core & data</h3>
+                        <div class="gpa-main-content">
+                            <div class="gpa-summary-cards">
+                                <div class="gpa-card term-gpa">
+                                    <div class="gpa-label">Term GPA</div>
+                                    <div class="gpa-value" id="term-gpa-display">0.00</div>
+                                    <div class="gpa-courses" id="term-gpa-courses">0 courses</div>
                                 </div>
-                                <div class="credit-sum">17 credits</div>
-                            </div>
-                            <div class="courses-container">
-                                <div class="course-row" data-course-id="s2c1">
-                                    <span class="course-name"><i class="fas fa-circle"></i> object oriented prog.</span>
-                                    <span class="course-credits" data-credits="4">4 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s2c2">
-                                    <span class="course-name"><i class="fas fa-circle"></i> physics</span>
-                                    <span class="course-credits" data-credits="4">4 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s2c3">
-                                    <span class="course-name"><i class="fas fa-circle"></i> discrite math</span>
-                                    <span class="course-credits" data-credits="3">3 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s2c4">
-                                    <span class="course-name"><i class="fas fa-circle"></i> intro to data science</span>
-                                    <span class="course-credits" data-credits="3">3 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s2c5">
-                                    <span class="course-name"><i class="fas fa-circle"></i> network basics</span>
-                                    <span class="course-credits" data-credits="3">3 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
+                                <div class="gpa-card cumulative-gpa">
+                                    <div class="gpa-label">Cumulative GPA</div>
+                                    <div class="gpa-value" id="cumulative-gpa-display">0.00</div>
+                                    <div class="gpa-courses" id="cumulative-gpa-courses">0 courses</div>
                                 </div>
                             </div>
-                            <div class="semester-actions">
-                                <button class="add-course-btn" onclick="showAddSubjectModal(this)">
-                                    <i class="fas fa-plus-circle"></i> add subject
+
+                            <div class="subject-search-section">
+                                <h4><i class="fas fa-search"></i> Add Subject by Name</h4>
+                                <div class="search-input-group">
+                                    <input type="text" id="subject-search-input" class="subject-search-input" 
+                                        placeholder="Type subject name (e.g., 'Programming', 'Math')..." autocomplete="off">
+                                    <button class="search-btn" onclick="searchSubjects()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                <div id="search-results" class="search-results" style="display: none;"></div>
+                                <div id="selected-gpa-subjects" class="selected-subjects-list"></div>
+                            </div>
+
+                            <div class="quick-grade-section">
+                                <h4><i class="fas fa-bolt"></i> Quick Grade Entry</h4>
+                                <div class="grade-buttons-grid">
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('A')">A (4.0)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('A-')">A- (3.7)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('B+')">B+ (3.3)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('B')">B (3.0)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('B-')">B- (2.7)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('C+')">C+ (2.3)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('C')">C (2.0)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('D')">D (1.0)</button>
+                                    <button class="grade-btn-quick" onclick="quickGradeAll('F')">F (0.0)</button>
+                                </div>
+                            </div>
+
+                            <div class="gpa-action-buttons">
+                                <button class="view-analysis-btn" onclick="toggleGPAAnalysis()">
+                                    <i class="fas fa-chart-bar"></i> View Analysis
                                 </button>
-                                <button class="drop-course-btn" onclick="showDropSubjectsMode(this)">
-                                    <i class="fas fa-minus-circle"></i> drop subjects
+                                <button class="reset-grades-btn" onclick="confirmResetGrades()">
+                                    <i class="fas fa-redo-alt"></i> Reset All
                                 </button>
                             </div>
                         </div>
-                        
-                        <!-- Semester 3 -->
-                        <div class="semester-item" data-semester="3">
-                            <div class="semester-head">
-                                <div class="semester-title">
-                                    <span class="sem-num">sem 3</span>
-                                    <h3 contenteditable="true">intelligent systems</h3>
-                                </div>
-                                <div class="credit-sum">16 credits</div>
-                            </div>
-                            <div class="courses-container">
-                                <div class="course-row" data-course-id="s3c1">
-                                    <span class="course-name"><i class="fas fa-circle"></i> Advanced network</span>
-                                    <span class="course-credits" data-credits="4">4 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s3c2">
-                                    <span class="course-name"><i class="fas fa-circle"></i> Cyber Security</span>
-                                    <span class="course-credits" data-credits="3">3 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s3c3">
-                                    <span class="course-name"><i class="fas fa-circle"></i> web</span>
-                                    <span class="course-credits" data-credits="4">4 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s3c4">
-                                    <span class="course-name"><i class="fas fa-circle"></i> Operating Systems</span>
-                                    <span class="course-credits" data-credits="3">3 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="course-row" data-course-id="s3c5">
-                                    <span class="course-name"><i class="fas fa-circle"></i> project I</span>
-                                    <span class="course-credits" data-credits="2">2 cr</span>
-                                    <div class="course-actions">
-                                        <button class="delete-course-btn" onclick="deleteCourse(this)">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="semester-actions">
-                                <button class="add-course-btn" onclick="showAddSubjectModal(this)">
-                                    <i class="fas fa-plus-circle"></i> add subject
-                                </button>
-                                <button class="drop-course-btn" onclick="showDropSubjectsMode(this)">
-                                    <i class="fas fa-minus-circle"></i> drop subjects
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="semester-counter" class="semester-counter">
-                        <i class="fas-regular fa-calendar-plus"></i> 5 more semesters planned
                     </div>
                 </div>
 
-                <!-- Right panel – career guidance -->
-                <div class="right-panel">
-                    <div class="path-card">
-                        <h4><i class="fas fa-map-signs"></i> career track</h4>
-                        <div class="career-name">Cyber Security</div>
-                        <div class="path-stats">
-                            <div><i class="fas fa-briefcase"></i> <span id="courses-left">8</span> courses left</div>
-                            <div><i class="fas fa-flask"></i> <span id="capstone-count">1</span> capstone</div>
+                <!-- ========== PREVIEW VIEW (Career Path Timeline) ========== -->
+                <div id="planning-preview-view" class="planning-view">
+                    <!-- Career Path Timeline -->
+                    <div class="career-path-container">
+                        <div class="career-path-header">
+                            <h2><i class="fas fa-road"></i> Your Career Path: <span id="preview-career-name">Cyber Security</span></h2>
+                            <div class="path-legend">
+                                <div class="legend-item"><span class="legend-dot completed"></span> Completed</div>
+                                <div class="legend-item"><span class="legend-dot current"></span> Current</div>
+                                <div class="legend-item"><span class="legend-dot upcoming"></span> Upcoming</div>
+                                <div class="legend-item"><span class="legend-dot summer"></span> Summer</div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="academic-tip">
-                        <p><i class="fas fa-lightbulb"></i> next milestone suggestion</p>
-                        <div class="tip-desc" id="milestone-suggestion">
-                            <strong>CS 380 - computer vision</strong> (3 cr) · aligns with AI engineer path. <br> offered in sem 4, pre-req: linear algebra + ML intro.
+
+                        <!-- Timeline -->
+                        <div class="timeline-wrapper">
+                            <div class="timeline-line" id="career-timeline">
+                                <!-- Populated by JS -->
+                            </div>
                         </div>
-                    </div>
-                    <div class="progress-block">
-                        <div class="progress-label">
-                            <span><i class="fas fa-tasks"></i> degree progress</span>
-                            <span id="progress-percentage">67%</span>
-                        </div>
-                        <div class="bar-bg">
-                            <div class="bar-fill" id="progress-bar" style="width: 67%;"></div> 
-                        </div>
-                    </div>
-                    <div class="roadmap-title">roadmap preview</div>
-                    <div class="roadmap-mini" id="roadmap-mini">
-                        <div class="milestone completed"><span class="dot">1</span>sem1</div>
-                        <div class="connector"></div>
-                        <div class="milestone completed"><span class="dot">2</span>sem2</div>
-                        <div class="connector"></div>
-                        <div class="milestone"><span class="dot">3</span>sem3</div>
-                        <div class="connector"></div>
-                        <div class="milestone"><span class="dot">4</span>sem4</div>
-                        <div class="connector"></div>
-                        <div class="milestone"><span class="dot">5</span>sem5</div>
-                    </div>
-                    <div class="advisor-note">
-                        <i class="fas fa-robot"></i>
-                        <div id="ai-advisor-text"><strong>AI advisor:</strong> based on your interest in NLP, consider adding 'speech processing' as elective (3cr).</div>
-                    </div>
-                    <div id="graduation-info" class="graduation-info">
-                        <div class="info-item">
-                            <i class="fas fa-hourglass-half"></i> 
-                            <span><strong>remaining credits:</strong> <span id="remaining-credits-display">42</span></span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-calendar-alt"></i> 
-                            <span><strong>est. graduation:</strong> <span id="graduation-date">may '27</span></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- GPA Calculator Panel -->
-            <!-- Enhanced GPA Calculator with Subject Search -->
-            <div class="gpa-calculator-enhanced">
-                <div class="gpa-header">
-                    <h3><i class="fas fa-calculator"></i> GPA Calculator</h3>
-                    <div class="gpa-header-actions">
-                        <button class="gpa-toggle-btn" onclick="toggleGPASection()">
-                            <i class="fas fa-chevron-up"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="gpa-main-content">
-                    <!-- GPA Summary Cards -->
-                    <div class="gpa-summary-cards">
-                        <div class="gpa-card term-gpa">
-                            <div class="gpa-label">Term GPA</div>
-                            <div class="gpa-value" id="term-gpa-display">0.00</div>
-                            <div class="gpa-courses" id="term-gpa-courses">0 courses</div>
-                        </div>
-                        <div class="gpa-card cumulative-gpa">
-                            <div class="gpa-label">Cumulative GPA</div>
-                            <div class="gpa-value" id="cumulative-gpa-display">0.00</div>
-                            <div class="gpa-courses" id="cumulative-gpa-courses">0 courses</div>
+
+                        <!-- Summary Cards -->
+                        <div class="path-summary-row" id="path-summary-row">
+                            <!-- Populated by JS -->
                         </div>
                     </div>
 
-                    <!-- Subject Search and Add Section -->
-                    <div class="subject-search-section">
-                        <h4><i class="fas fa-search"></i> Add Subject by Name</h4>
-                        <div class="search-input-group">
-                            <input type="text" 
-                                id="subject-search-input" 
-                                class="subject-search-input" 
-                                placeholder="Type subject name (e.g., 'Programming', 'Math')..."
-                                autocomplete="off">
-                            <button class="search-btn" onclick="searchSubjects()">
-                                <i class="fas fa-search"></i>
+                    <!-- Advisor Chat Panel -->
+                    <div class="advisor-chat-panel" id="advisor-chat-panel">
+                        <div class="advisor-chat-header">
+                            <span class="online-dot"></span>
+                            <h3><i class="fas fa-robot"></i> AI Career Advisor</h3>
+                            <span style="margin-left:auto;font-size:0.8rem;opacity:0.8;">Online</span>
+                        </div>
+                        <div class="advisor-chat-messages" id="advisor-chat-messages">
+                            <div class="advisor-message ai">
+                                <div class="advisor-avatar ai-avatar">🤖</div>
+                                <div class="advisor-bubble">
+                                    Hello! I'm your AI Academic Advisor. I can help you with:
+                                    <br>• Course recommendations for your career path
+                                    <br>• Summer course planning
+                                    <br>• Prerequisite checks
+                                    <br>• Graduation timeline questions
+                                    <br><br>How can I help you today?
+                                </div>
+                            </div>
+                        </div>
+                        <div class="advisor-suggestions" id="advisor-suggestions">
+                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('What courses should I take next semester?')">📚 Next semester courses</span>
+                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('Are there any summer courses I should consider?')">☀️ Summer courses</span>
+                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('What is my graduation timeline?')">🎓 Graduation timeline</span>
+                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('What are the prerequisites I still need?')">📋 Prerequisites</span>
+                        </div>
+                        <div class="advisor-chat-input-area">
+                            <input type="text" id="advisor-chat-input" placeholder="Ask your advisor anything..." 
+                                onkeypress="if(event.key==='Enter') sendAdvisorMessage()">
+                            <button onclick="sendAdvisorMessage()">
+                                <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
-                        
-                        <!-- Search Results Dropdown -->
-                        <div id="search-results" class="search-results" style="display: none;">
-                            <!-- Results will be dynamically added here -->
-                        </div>
-                        
-                        <!-- Selected Subjects for GPA Calculation -->
-                        <div id="selected-gpa-subjects" class="selected-subjects-list">
-                            <!-- Selected subjects will appear here -->
-                        </div>
-                    </div>
-
-                    <!-- Semester GPA Calculator -->
-                    <div class="semester-gpa-section">
-                        <h4><i class="fas fa-layer-group"></i> Semester GPA Calculator</h4>
-                        
-                        <!-- Semester Selector -->
-                        <div class="semester-selector">
-                            <select id="semester-select" class="semester-select" onchange="loadSemesterCourses()">
-                                <option value="all">All Semesters</option>
-                                <option value="sem1">Semester 1</option>
-                                <option value="sem2">Semester 2</option>
-                                <option value="sem3">Semester 3</option>
-                                <option value="sem4">Semester 4</option>
-                                <option value="sem5">Semester 5</option>
-                                <option value="sem6">Semester 6</option>
-                                <option value="sem7">Semester 7</option>
-                                <option value="sem8">Semester 8</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Semester GPA Display -->
-                        <div class="semester-gpa-cards" id="semester-gpa-cards">
-                            <!-- Semester GPA cards will be dynamically added -->
-                        </div>
-                    </div>
-
-                    <!-- Quick Grade Entry -->
-                    <div class="quick-grade-section">
-                        <h4><i class="fas fa-bolt"></i> Quick Grade Entry</h4>
-                        <div class="grade-buttons-grid">
-                            <button class="grade-btn-quick" onclick="quickGradeAll('A')">A (4.0)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('A-')">A- (3.7)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('B+')">B+ (3.3)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('B')">B (3.0)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('B-')">B- (2.7)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('C+')">C+ (2.3)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('C')">C (2.0)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('C-')">C- (1.7)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('D')">D (1.0)</button>
-                            <button class="grade-btn-quick" onclick="quickGradeAll('F')">F (0.0)</button>
-                        </div>
-                    </div>
-
-                    <!-- Detailed GPA Analysis -->
-                    <div class="gpa-analysis-section" id="gpa-analysis-section" style="display: none;">
-                        <h4><i class="fas fa-chart-line"></i> Detailed Analysis</h4>
-                        
-                        <!-- Grade Distribution -->
-                        <div class="grade-distribution">
-                            <h5>Grade Distribution</h5>
-                            <div id="grade-distribution-bars" class="distribution-bars">
-                                <!-- Distribution bars will be added here -->
-                            </div>
-                        </div>
-                        
-                        <!-- GPA Statistics -->
-                        <div class="gpa-statistics">
-                            <div class="stat-card">
-                                <span class="stat-label">Total Credits</span>
-                                <span class="stat-value" id="total-credits-gpa">0</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label">Quality Points</span>
-                                <span class="stat-value" id="total-points-gpa">0.0</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-label">GPA Hours</span>
-                                <span class="stat-value" id="gpa-hours-gpa">0</span>
-                            </div>
-                            <div class="stat-card highlight">
-                                <span class="stat-label">Current GPA</span>
-                                <span class="stat-value" id="detailed-gpa">0.00</span>
-                            </div>
-                        </div>
-                        
-                        <!-- What-If Scenario -->
-                        <div class="what-if-section">
-                            <h5><i class="fas fa-flask"></i> What-If Analysis</h5>
-                            <div class="what-if-inputs">
-                                <input type="number" id="what-if-credits" placeholder="Additional Credits" min="1" max="20">
-                                <select id="what-if-grade">
-                                    <option value="4.0">A (4.0)</option>
-                                    <option value="3.7">A- (3.7)</option>
-                                    <option value="3.3">B+ (3.3)</option>
-                                    <option value="3.0">B (3.0)</option>
-                                    <option value="2.7">B- (2.7)</option>
-                                    <option value="2.3">C+ (2.3)</option>
-                                    <option value="2.0">C (2.0)</option>
-                                    <option value="1.7">C- (1.7)</option>
-                                    <option value="1.0">D (1.0)</option>
-                                    <option value="0.0">F (0.0)</option>
-                                </select>
-                                <button class="calculate-whatif-btn" onclick="calculateWhatIfGPA()">
-                                    <i class="fas fa-calculator"></i> Calculate
-                                </button>
-                            </div>
-                            <div id="what-if-result" class="what-if-result" style="display: none;">
-                                <!-- What-if result will appear here -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="gpa-action-buttons">
-                        <button class="view-analysis-btn" onclick="toggleGPAAnalysis()">
-                            <i class="fas fa-chart-bar"></i> View Analysis
-                        </button>
-                        <button class="reset-grades-btn" onclick="confirmResetGrades()">
-                            <i class="fas fa-redo-alt"></i> Reset All
-                        </button>
                     </div>
                 </div>
+
+                <!-- Footer identity -->
+                <div class="footer-credit"> 
+                    <span><i class="fas fa-copyright"></i> 2024 EduPath. All rights reserved.</span>
+                    <div id="last-updated"><i class="fas fa-sync-alt"></i> last updated today</div>
+                </div>
             </div>
-
-
-
-<!-- Grade Scale Reference (Hidden by default) -->
-<div class="grade-scale-reference" id="grade-scale-reference" style="display: none;">
-    <h4>Grade Scale Reference</h4>
-    <table class="grade-scale-table">
-        <tr><td>A (4.0) - Excellent</td><td>A- (3.7)</td><td>B+ (3.3)</td></tr>
-        <tr><td>B (3.0) - Good</td><td>B- (2.7)</td><td>C+ (2.3)</td></tr>
-        <tr><td>C (2.0) - Satisfactory</td><td>C- (1.7)</td><td>D+ (1.3)</td></tr>
-        <tr><td>D (1.0) - Passing</td><td>F (0.0) - Fail</td><td></td></tr>
-    </table>
-</div>
-
-            <!-- Footer identity -->
-            <div class="footer-credit"> 
-                <span><i class="fas fa-copyright"></i> 2024 EduPath. All rights reserved.</span>
-                <div id="last-updated"><i class="fas fa-sync-alt"></i> last updated today</div>
-            </div>
-        </div>
-    </section>
+        </section>
 
         <!-- Courses Page -->
         <section id="courses" class="page">
@@ -1278,7 +1063,7 @@
     </div>
 
     <!-- JavaScript -->
-    <script src="js/home_script.js"></script>
     <script src="js/backend_api.js"></script>
+    <script src="js/home_script.js"></script>
 </body>
 </html>

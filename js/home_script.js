@@ -1,4 +1,4 @@
-﻿// Firebase Configuration
+// Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyDoZebcPthz70oxICYAMm4W43JGXVUkTZE",
     authDomain: "edumate-8b4c3.firebaseapp.com",
@@ -8,9 +8,225 @@ const firebaseConfig = {
     appId: "1:962420815642:web:a8f38ee45034fdefb31ea3"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
+// Initialize Firebase with safety check
+if (typeof firebase !== 'undefined') {
+    try {
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+    } catch (e) { console.warn('Firebase init failed:', e); }
+} else {
+    console.warn('Firebase SDK not found');
+}
+
+// API HELPER - Using unified backend_api.js version if available
+const apiFetch = (path, options) => {
+    if (window.apiFetch && window.apiFetch !== apiFetch) return window.apiFetch(path, options);
+    // Fallback if backend_api.js not loaded
+    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://localhost:8000/api/v1';
+    const headers = { Accept: 'application/json', ...(options?.headers || {}) };
+    const token = localStorage.getItem('edumate_access_token') || sessionStorage.getItem('edumate_access_token');
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (options?.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    return fetch(`${API_BASE}${path}`, {
+        method: options?.method || 'GET',
+        headers,
+        body: options?.body
+    }).then(res => res.json());
+};
+
+// ============================================
+// PLAN / PREVIEW TOGGLE & NEW FEATURES
+// ============================================
+
+function switchPlanningView(view) {
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.planning-view').forEach(v => v.classList.remove('active'));
+    
+    if (view === 'plan') {
+        const planBtn = document.querySelector('.toggle-btn:first-child');
+        if (planBtn) planBtn.classList.add('active');
+        const planView = document.getElementById('planning-plan-view');
+        if (planView) planView.classList.add('active');
+    } else {
+        const previewBtn = document.querySelector('.toggle-btn:last-child');
+        if (previewBtn) previewBtn.classList.add('active');
+        const previewView = document.getElementById('planning-preview-view');
+        if (previewView) previewView.classList.add('active');
+        loadCareerTimeline();
+        loadSummerCourses();
+        loadAdvisorSuggestions();
+    }
+}
+
+async function loadCareerTimeline() {
+    try {
+        const data = await apiFetch('/planning/timeline/me');
+        const timeline = document.getElementById('career-timeline');
+        if (!timeline) return;
+        
+        const careerName = document.getElementById('preview-career-name');
+        if (careerName) careerName.textContent = data.career_path || 'Your Career';
+        
+        timeline.innerHTML = (data.semesters || []).map((s, i) => {
+            const statusClass = (s.status || 'upcoming').replace(' summer', '');
+            const isSummer = (s.status || '').includes('summer');
+            const circleClass = isSummer ? 'summer' : statusClass;
+            return `
+            <div class="timeline-node">
+                <div class="node-circle ${circleClass}">${i + 1}</div>
+                <div class="node-label">
+                    <div class="node-semester">${s.name || ''}</div>
+                    <div class="node-courses">${s.total_credits || 0} credits</div>
+                    <div class="node-status ${statusClass}-status">
+                        ${statusClass === 'completed' ? '✅ Done' : statusClass === 'current' ? '🔄 Active' : isSummer ? '☀️ Summer' : '📅 Planned'}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+        
+        const total = (data.semesters || []).reduce((a, s) => a + (s.total_credits || 0), 0);
+        const earned = (data.semesters || []).reduce((a, s) => a + (s.completed_credits || 0), 0);
+        const done = (data.semesters || []).filter(s => s.status === 'completed').length;
+        
+        const summaryRow = document.getElementById('path-summary-row');
+        if (summaryRow) {
+            summaryRow.innerHTML = `
+                <div class="path-summary-card"><h4>📊 Progress</h4><div class="summary-value">${data.total_progress || 0}%</div></div>
+                <div class="path-summary-card"><h4>✅ Earned</h4><div class="summary-value">${earned}</div></div>
+                <div class="path-summary-card"><h4>📅 Remaining</h4><div class="summary-value">${total - earned}</div></div>
+                <div class="path-summary-card"><h4>🎯 Done</h4><div class="summary-value">${done}/${(data.semesters || []).length}</div></div>`;
+        }
+    } catch (e) {
+        console.error('Failed to load timeline:', e);
+    }
+}
+
+// ============================================
+// SUMMER COURSE REQUEST - Simple: load from DB, student picks, saves to DB
+// ============================================
+
+async function loadSummerCourses() {
+    try {
+        const data = await apiFetch('/planning/summer-courses/me');
+        const container = document.getElementById('summer-course-list');
+        if (!container) return;
+        
+        if (!data || !data.length) {
+            container.innerHTML = '<p style="color:#92400e;font-size:0.9rem;">No summer courses available for your program.</p>';
+            return;
+        }
+        
+        container.innerHTML = data.map(c => `
+            <div class="summer-course-item" id="summer-item-${c.id}">
+                <div class="summer-course-info">
+                    <span class="summer-course-code">${c.code}</span>
+                    <span class="summer-course-name">${c.name}</span>
+                    <span class="summer-course-credits">(${c.credits} cr)</span>
+                    ${!c.prerequisite_met ? 
+                        `<span style="color:#ef4444;font-size:0.7rem;">⚠️ Need: ${c.prerequisite?.code || 'N/A'}</span>` : 
+                        `<span style="color:#10b981;font-size:0.7rem;">✅ Ready</span>`
+                    }
+                </div>
+                <button class="request-this-btn" 
+                        id="request-btn-${c.id}"
+                        onclick="requestSummerCourse(${c.id}, '${c.name.replace(/'/g, "\\'")}')">
+                    📝 Request
+                </button>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load summer courses:', e);
+    }
+}
+
+async function requestSummerCourse(courseId, courseName) {
+    const button = document.getElementById(`request-btn-${courseId}`);
+    if (!button) return;
+    
+    button.disabled = true;
+    button.textContent = '⏳ Sending...';
+    
+    try {
+        await apiFetch('/planning/summer-courses/request', {
+            method: 'POST',
+            body: JSON.stringify({ course_id: courseId, course_name: courseName })
+        });
+        
+        button.textContent = '✅ Requested';
+        button.classList.add('requested');
+        button.style.background = '#10b981';
+        button.style.border = '1px solid #10b981';
+        button.style.color = 'white';
+        button.disabled = true;
+        
+        showNotification(`Request for "${courseName}" submitted! Admin will review it.`, 'success');
+    } catch (e) {
+        button.disabled = false;
+        button.textContent = '📝 Request';
+        showNotification('Failed to submit request. Try again.', 'error');
+    }
+}
+
+function viewAllSummerCourses() {
+    // Just scroll to the summer section in the plan view
+    const section = document.getElementById('summer-request-section');
+    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function sendAdvisorMessage() {
+    const input = document.getElementById('advisor-chat-input');
+    const container = document.getElementById('advisor-chat-messages');
+    if (!input || !container) return;
+    const msg = input.value.trim();
+    if (!msg) return;
+    
+    input.value = '';
+    appendAdvisorBubble(container, 'user', msg);
+    
+    try {
+        const data = await apiFetch('/planning/advisor/chat', {
+            method: 'POST',
+            body: JSON.stringify({ message: msg, channel: 'planning_advisor' })
+        });
+        appendAdvisorBubble(container, 'ai', data.message || 'No response');
+        updateAdvisorSuggestions(data.suggestions || []);
+    } catch (e) {
+        appendAdvisorBubble(container, 'ai', 'Sorry, could not process your request. Try again.');
+    }
+}
+
+function sendAdvisorQuickMessage(msg) {
+    const input = document.getElementById('advisor-chat-input');
+    if (input) input.value = msg;
+    sendAdvisorMessage();
+}
+
+function appendAdvisorBubble(container, type, text) {
+    const div = document.createElement('div');
+    div.className = `advisor-message ${type}`;
+    div.innerHTML = `
+        <div class="advisor-avatar ${type === 'ai' ? 'ai-avatar' : 'user-avatar'}">${type === 'ai' ? '🤖' : '👤'}</div>
+        <div class="advisor-bubble">${(text || '').replace(/\n/g, '<br>')}</div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function updateAdvisorSuggestions(suggestions) {
+    const container = document.getElementById('advisor-suggestions');
+    if (!container) return;
+    container.innerHTML = (suggestions || []).map(s => 
+        `<span class="suggestion-chip" onclick="sendAdvisorQuickMessage('${s}')">${s}</span>`
+    ).join('');
+}
+
+function loadAdvisorSuggestions() {
+    updateAdvisorSuggestions([
+        'What courses should I take next?',
+        'Are there summer courses?',
+        'Show graduation timeline',
+        'Check my prerequisites'
+    ]);
+}
 
 // Global Variables
 let users = JSON.parse(localStorage.getItem('edumate_users')) || {};
@@ -23,7 +239,7 @@ let resumeData = {
     linkedin: "linkedin.com/in/mohamed",
     github: "github.com/mohamed",
     education: [
-        { degree: "B.Sc Computer Science", school: "Cairo University", year: "2022 â€“ 2026" }
+        { degree: "B.Sc Computer Science", school: "Cairo University", year: "2022 – 2026" }
     ],
     experience: [
         { title: "Frontend Developer Intern", company: "TechCorp", dates: "Summer 2024", desc: "Built responsive web apps using React and Tailwind" }
@@ -31,6 +247,82 @@ let resumeData = {
     skills: "Python, JavaScript, React, Node.js, SQL, Git, AWS",
     projects: []
 };
+
+if (localStorage.getItem('edumate_resume')) {
+    resumeData = JSON.parse(localStorage.getItem('edumate_resume'));
+}
+
+const InternshipsData = [
+    { title: 'Software Engineer', company: 'Iskraemco', match: 92, reason: 'Strong Python + SQL skills', salary: '$65K - $85K', applyUrl: 'https://iskraemeco.com/' },
+    { title: 'Frontend Developer', company: 'Amazon', match: 88, reason: 'JavaScript experience', salary: '$70K - $90K', applyUrl: 'https://www.amazon.Internships/en/Internships/123456/frontend-developer' },
+    { title: 'Data Analyst', company: 'e&', match: 85, reason: 'Analytical skills', salary: '$60K - $80K', applyUrl: 'https://www.eand.com.eg/StaticFiles/career/#/home' }
+];
+
+const coursesData = {
+    tech: [
+        { id: 1, title: "Full Stack Web Development", provider: "Coursera", category: "tech", difficulty: "beginner", duration: "12 weeks", progress: 75, enrolled: true, description: "Learn HTML, CSS, JavaScript, React, Node.js and MongoDB", image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.coursera.org/specializations/full-stack-react" },
+        { id: 2, title: "Python for Data Science", provider: "edX", category: "tech", difficulty: "intermediate", duration: "8 weeks", progress: 40, enrolled: true, description: "Master Python, NumPy, Pandas, and data visualization", image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.edx.org/course/python-for-data-science" },
+        { id: 3, title: "Machine Learning Fundamentals", provider: "Udacity", category: "tech", difficulty: "advanced", duration: "16 weeks", progress: 20, enrolled: true, description: "Learn algorithms, neural networks, and AI principles", image: "https://images.unsplash.com/photo-1555255707-c07966088b7b?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.udacity.com/course/intro-to-machine-learning--ud120" }
+    ],
+    business: [
+        { id: 4, title: "Digital Marketing Strategy", provider: "Google", category: "business", difficulty: "beginner", duration: "6 weeks", progress: 0, enrolled: false, description: "Learn SEO, social media, and content marketing", image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://learndigital.withgoogle.com/digitalgarage" }
+    ],
+    "soft-skills": [
+        { id: 5, title: "Effective Communication", provider: "LinkedIn Learning", category: "soft-skills", difficulty: "beginner", duration: "4 weeks", progress: 0, enrolled: false, description: "Improve your professional communication skills", image: "https://images.unsplash.com/photo-1551836026-d5c2c0b4d1c1?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.linkedin.com/learning" }
+    ],
+    career: [
+        { id: 6, title: "Job Interview Mastery", provider: "Udemy", category: "career", difficulty: "intermediate", duration: "5 weeks", progress: 0, enrolled: false, description: "Ace your interviews with confidence", image: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.udemy.com/course/job-interview-mastery" }
+    ]
+};
+
+const COURSES_API_KEY = 'AIzaSyBkyGUHoOohj6VSZYbRLUa4mysfRgV5FTY';
+const COURSES_CX = 'c77318ddf11b04d7d';
+let currentSearchResults = [], currentPage = 1, itemsPerPage = 9, currentSearchQuery = '';
+
+async function searchCourses(query = null, page = 1) { /* ... unchanged ... */ }
+async function searchGoogleCourses(query, startIndex = 1) { /* ... unchanged ... */ }
+function setupPagination(totalPages, currentPage, query) { /* ... unchanged ... */ }
+function setupSimplePagination(hasMore, currentPage, query) { /* ... unchanged ... */ }
+function quickSearch(topic) { document.getElementById('course-search-input').value = topic; searchCourses(topic, 1); }
+function extractPlatform(url, title) { /* ... unchanged ... */ }
+function saveCustomCourse(itemData) { if (window.saveCustomCourse && window.saveCustomCourse !== saveCustomCourse) return window.saveCustomCourse.apply(this, arguments); }
+function getImageFromItem(item) { /* ... unchanged ... */ }
+
+function initializeApp() {
+    updateSidebarFromStorage(); applyStoredProfileToUI();
+    const logged = sessionStorage.getItem('edumate_logged') === '1';
+    const seenWelcome = localStorage.getItem('edumate_seen_welcome') === '1';
+    if (!logged && !seenWelcome) { navigateTo('welcome'); localStorage.setItem('edumate_seen_welcome', '1'); }
+    else if (logged) { navigateTo('dashboard'); }
+    else { navigateTo('login'); }
+}
+
+function setupEventListeners() {
+    document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+    document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
+    document.getElementById('ai-chat-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendAIChatMessage(); });
+    document.getElementById('ai-popup-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendAIPopupMessage(); });
+}
+
+function toggleTheme() { document.body.classList.toggle('dark-theme'); localStorage.setItem('edumate_theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light'); updateThemeIcon(); }
+function updateThemeIcon() { const t = document.getElementById('theme-toggle'); if (t) t.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙'; }
+function toggleSidebar() { /* ... unchanged ... */ }
+function attemptLogin() { if (window.attemptLogin && window.attemptLogin !== attemptLogin) return window.attemptLogin.apply(this, arguments); }
+function firebaseLogin(providerType) { /* ... unchanged ... */ }
+function integrateSocialUser(socialUser) { /* ... unchanged ... */ }
+function loginUser(username, remember) { if (window.loginUser && window.loginUser !== loginUser) return window.loginUser.apply(this, arguments); }
+function signOut() { if (window.signOut && window.signOut !== signOut) return window.signOut.apply(this, arguments); }
+function startRegistration() { /* ... unchanged ... */ }
+function fillInfoPageFromTemp() { /* ... unchanged ... */ }
+function previewInfoAvatar(input) { /* ... unchanged ... */ }
+function completeRegistration() { if (window.completeRegistration && window.completeRegistration !== completeRegistration) return window.completeRegistration.apply(this, arguments); }
+function updateSidebarFromStorage() { if (window.updateSidebarFromStorage && window.updateSidebarFromStorage !== updateSidebarFromStorage) return window.updateSidebarFromStorage.apply(this, arguments); }
+function applyStoredProfileToUI() { if (window.applyStoredProfileToUI && window.applyStoredProfileToUI !== applyStoredProfileToUI) return window.applyStoredProfileToUI.apply(this, arguments); }
+function changeProfileAvatar(input) { /* ... unchanged ... */ }
+function saveProfileEdits() { if (window.saveProfileEdits && window.saveProfileEdits !== saveProfileEdits) return window.saveProfileEdits.apply(this, arguments); }
+function toggleAIPopup() { document.getElementById('aiPopup').classList.toggle('active'); }
+function sendAIChatMessage() { if (window.sendAIChatMessage && window.sendAIChatMessage !== sendAIChatMessage) return window.sendAIChatMessage.apply(this, arguments); }
+function sendAIPopupMessage() { if (window.sendAIPopupMessage && window.sendAIPopupMessage !== sendAIPopupMessage) return window.sendAIPopupMessage.apply(this, arguments); }
 
 // Load resume data from localStorage
 if (localStorage.getItem('edumate_resume')) {
@@ -162,13 +454,11 @@ const coursesData = {
 const COURSES_API_KEY = 'AIzaSyBkyGUHoOohj6VSZYbRLUa4mysfRgV5FTY';
 const COURSES_CX = 'c77318ddf11b04d7d';
 
-// Global variables for pagination
 let currentSearchResults = [];
 let currentPage = 1;
 let itemsPerPage = 9;
 let currentSearchQuery = '';
 
-// Search courses function with pagination
 async function searchCourses(query = null, page = 1) {
     if (!query) {
         query = document.getElementById('course-search-input')?.value.trim();
@@ -264,14 +554,14 @@ async function searchCourses(query = null, page = 1) {
                                 <button onclick="saveCustomCourse('${encodeURIComponent(JSON.stringify(item))}')" 
                                         class="link-btn" 
                                         style="flex:1; padding:10px; font-size:0.9rem;">
-                                    ðŸ“Œ Save
+                                    📌 Save
                                 </button>
                                 <a href="${item.link}" 
                                    target="_blank" 
                                    rel="noopener noreferrer"
                                    class="btn" 
                                    style="flex:1; text-align:center; text-decoration:none; padding:10px; font-size:0.9rem;">
-                                    View â†’
+                                    View →
                                 </a>
                             </div>
                         </div>
@@ -359,7 +649,7 @@ function setupPagination(totalPages, currentPage, query) {
         <button class="btn" 
                 onclick="searchCourses('${query}', ${currentPage - 1})"
                 ${currentPage === 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
-            â† Previous
+            ← Previous
         </button>
     `;
     
@@ -380,7 +670,7 @@ function setupPagination(totalPages, currentPage, query) {
         <button class="btn" 
                 onclick="searchCourses('${query}', ${currentPage + 1})"
                 ${currentPage === totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
-            Next â†’
+            Next →
         </button>
     `;
     
@@ -399,7 +689,7 @@ function setupSimplePagination(hasMore, currentPage, query) {
         <button class="btn" 
                 onclick="searchCourses('${query}', ${currentPage - 1})"
                 ${currentPage === 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
-            â† Previous
+            ← Previous
         </button>
     `;
     
@@ -413,7 +703,7 @@ function setupSimplePagination(hasMore, currentPage, query) {
         <button class="btn" 
                 onclick="searchCourses('${query}', ${currentPage + 1})"
                 ${!hasMore ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
-            Next â†’
+            Next →
         </button>
     `;
     
@@ -968,7 +1258,7 @@ async function loadInternshipsByPosition(position = null) {
                 statsDiv.innerHTML = `
                     <span>Found ${result.items.length} job opportunities in ${result.searchInformation?.formattedSearchTime || 'unknown'} seconds</span>
                     ${result.searchInformation?.totalResults ? 
-                        `<span style="margin-left:15px">â€¢ Total available: ${result.searchInformation.totalResults}</span>` : ''}
+                        `<span style="margin-left:15px">• Total available: ${result.searchInformation.totalResults}</span>` : ''}
                 `;
                 container.insertBefore(statsDiv, container.firstChild);
             }
@@ -1126,7 +1416,7 @@ function addEducation(entry = {}) {
     div.innerHTML = `
         <input placeholder="Degree" class="input" value="${entry.degree || ''}" style="margin-bottom:8px">
         <input placeholder="University" class="input" value="${entry.school || ''}" style="margin-bottom:8px">
-        <input placeholder="Year (e.g. 2022 â€“ 2026)" class="input" value="${entry.year || ''}">
+        <input placeholder="Year (e.g. 2022 – 2026)" class="input" value="${entry.year || ''}">
         <button class="link-btn" style="color:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Remove</button>
     `;
     container.appendChild(div);
@@ -1185,8 +1475,8 @@ function generateModernTemplate() {
             <h1 style="margin:0;font-size:2.8em;color:#6C5CE7">${resumeData.name || 'Your Name'}</h1>
             <p style="margin:10px 0;font-size:1.2em;color:#555">${resumeData.title || 'Professional Title'}</p>
             <p style="margin:5px 0;color:#666">
-                ${resumeData.email || 'email@example.com'} â€¢ ${resumeData.phone || '+20 123 456 7890'} â€¢ ${resumeData.location || 'City, Country'}<br>
-                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> â€¢ ` : ''}
+                ${resumeData.email || 'email@example.com'} • ${resumeData.phone || '+20 123 456 7890'} • ${resumeData.location || 'City, Country'}<br>
+                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
                 ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
             </p>
         </header>
@@ -1198,7 +1488,7 @@ function generateModernTemplate() {
         ${resumeData.education.map(e => `
             <div style="margin-bottom:20px">
                 <strong style="font-size:1.1em">${e.degree}</strong><br>
-                <em>${e.school} â€¢ ${e.year}</em>
+                <em>${e.school} • ${e.year}</em>
             </div>
         `).join('')}
 
@@ -1255,7 +1545,7 @@ function generateClassicTemplate() {
 
                 <h3>Contact</h3>
                 <p>${resumeData.email || 'email@example.com'}<br>${resumeData.phone || '+20 123 456 7890'}<br>${resumeData.location || 'City, Country'}</p>
-                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> â€¢ ` : ''}
+                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
                 ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
 
                 <h3>Skills</h3>
@@ -1269,13 +1559,13 @@ function generateClassicTemplate() {
                 ${resumeData.education.map(e => `
                 <p>
                     <strong>${e.degree}</strong><br>
-                    ${e.school} â€“ ${e.year}
+                    ${e.school} – ${e.year}
                 </p>`).join('')}
 
                 <h3>Experience</h3>
                 ${resumeData.experience.map(exp => `
                 <div style="margin-bottom:15px">
-                    <strong>${exp.title}</strong> â€” ${exp.company}<br>
+                    <strong>${exp.title}</strong> — ${exp.company}<br>
                     <small>${exp.dates}</small>
                     <ul>${exp.desc.split('\n').map(d => `<li>${d}</li>`).join('')}</ul>
                 </div>`).join('')}
@@ -1296,8 +1586,8 @@ function generateCompactTemplate() {
     <div style="max-width:760px;margin:auto;font-family:Arial;line-height:1.4;color:#222">
         <h1 style="margin:0">${resumeData.name || 'Your Name'}</h1>
         <p>${resumeData.title || 'Professional Title'}</p>
-        <p>${resumeData.email || 'email@example.com'} â€¢ ${resumeData.phone || '+20 123 456 7890'} â€¢ ${resumeData.location || 'City, Country'}<br>
-            ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> â€¢ ` : ''}
+        <p>${resumeData.email || 'email@example.com'} • ${resumeData.phone || '+20 123 456 7890'} • ${resumeData.location || 'City, Country'}<br>
+            ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
             ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
         </p>
 
@@ -1311,7 +1601,7 @@ function generateCompactTemplate() {
 
         <h3>Education</h3>
         ${resumeData.education.map(e => `
-            <p><strong>${e.degree}</strong> â€” ${e.school} (${e.year})</p>
+            <p><strong>${e.degree}</strong> — ${e.school} (${e.year})</p>
         `).join('')}
         
         ${resumeData.projects.length ? `<h3>Projects</h3>
@@ -1400,7 +1690,7 @@ function generateSidebarTemplate() {
 
             <h3>Education</h3>
             ${resumeData.education.map(e => `
-                <p><strong>${e.degree}</strong><br>${e.school} â€” ${e.year}</p>
+                <p><strong>${e.degree}</strong><br>${e.school} — ${e.year}</p>
             `).join('')}
 
             ${resumeData.projects.length ? `<h3>Projects</h3>
@@ -1451,7 +1741,7 @@ function generateMinimalHeaderTemplate() {
                 <h3>EXPERIENCE</h3>
                 ${resumeData.experience.map(exp => `
                     <div style="margin-bottom:20px;">
-                        <strong>${exp.title}</strong> â€” ${exp.company}<br>
+                        <strong>${exp.title}</strong> — ${exp.company}<br>
                         <em>${exp.dates}</em>
                         <p style="margin-top:8px;">${exp.desc}</p>
                     </div>
@@ -1459,7 +1749,7 @@ function generateMinimalHeaderTemplate() {
 
                 <h3 style="margin-top:30px;">EDUCATION</h3>
                 ${resumeData.education.map(e => `
-                    <p><strong>${e.degree}</strong><br>${e.school} â€” ${e.year}</p>
+                    <p><strong>${e.degree}</strong><br>${e.school} — ${e.year}</p>
                 `).join('')}
                 
                 ${resumeData.projects.length ? `<h3 style="margin-top:30px;">PROJECTS</h3>
@@ -1518,7 +1808,7 @@ function generateSidebarPhotoTemplate() {
 
             <h2>Education</h2>
             ${resumeData.education.map(e => `
-                <p><strong>${e.degree}</strong><br>${e.school} â€” ${e.year}</p>
+                <p><strong>${e.degree}</strong><br>${e.school} — ${e.year}</p>
             `).join('')}
             
             ${resumeData.projects.length ? `<h2>Projects</h2>
@@ -1539,7 +1829,7 @@ function generateSoftPinkTemplate() {
             <h1 style="letter-spacing:2px;margin:0;font-size:2.5em;">${resumeData.name || 'Your Name'}</h1>
             <p style="margin-top:8px;font-size:1.1em;">${resumeData.title || 'Professional Title'}</p>
             <p>
-                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> â€¢ ` : ''}
+                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#6C5CE7;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
                 ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#6C5CE7;text-decoration:none" target="_blank">GitHub</a>` : ''}
             </p>
         </div>
@@ -1607,14 +1897,14 @@ function generateBlueProfessionalTemplate() {
             <h2 style="color:#1d4ed8; border-bottom:2px solid #1d4ed8;">Education</h2>
             ${resumeData.education.map(e => `
                 <div style="margin-bottom:10px;">
-                    <strong>${e.degree}</strong> â€” ${e.school} (${e.year})
+                    <strong>${e.degree}</strong> — ${e.school} (${e.year})
                 </div>
             `).join("")}
 
             <h2 style="color:#1d4ed8; border-bottom:2px solid #1d4ed8; margin-top:20px;">Experience</h2>
             ${resumeData.experience.map(exp => `
                 <div style="margin-bottom:15px;">
-                    <strong>${exp.title}</strong>, ${exp.company} â€” <em>${exp.dates}</em>
+                    <strong>${exp.title}</strong>, ${exp.company} — <em>${exp.dates}</em>
                     <p>${exp.desc}</p>
                 </div>
             `).join("")}
@@ -1651,7 +1941,7 @@ function generateBlueModernHeaderTemplate() {
             
             <h2 style="color:#3b82f6;">Education</h2>
             ${resumeData.education.map(e => `
-                <div><strong>${e.degree}</strong> â€” ${e.school} (${e.year})</div>
+                <div><strong>${e.degree}</strong> — ${e.school} (${e.year})</div>
             `).join("")}
 
             <h2 style="color:#3b82f6; margin-top:20px;">Experience</h2>
@@ -1709,7 +1999,7 @@ function generateMinimalElegantPhotoTemplate() {
             <h2 style="border-bottom:2px solid #e2e8f0;">Education</h2>
             ${resumeData.education.map(e => `
                 <div style="margin-bottom:10px;">
-                    <strong>${e.degree}</strong> â€” ${e.school} (${e.year})
+                    <strong>${e.degree}</strong> — ${e.school} (${e.year})
                 </div>
             `).join("")}
 
@@ -1761,7 +2051,7 @@ function generateProfessionalTwoColumnTemplate() {
                 <h2 style="font-size:18px;color:#ecf0f1;border-bottom:2px solid #7f8c8d;padding-bottom:5px;margin-bottom:15px;">SKILLS</h2>
                 <div style="font-size:14px;">
                     ${(resumeData.skills || '').split(',').map(skill => `
-                        <div style="margin-bottom:8px">â€¢ ${skill.trim()}</div>
+                        <div style="margin-bottom:8px">• ${skill.trim()}</div>
                     `).join('')}
                 </div>
             </div>
@@ -1780,8 +2070,8 @@ function generateProfessionalTwoColumnTemplate() {
             <div>
                 <h2 style="font-size:18px;color:#ecf0f1;border-bottom:2px solid #7f8c8d;padding-bottom:5px;margin-bottom:15px;">AFFILIATIONS</h2>
                 <div style="font-size:14px;">
-                    <div style="margin-bottom:8px">â€¢ American Society of Professionals</div>
-                    <div style="margin-bottom:8px">â€¢ Association of Information Technology Professionals</div>
+                    <div style="margin-bottom:8px">• American Society of Professionals</div>
+                    <div style="margin-bottom:8px">• Association of Information Technology Professionals</div>
                 </div>
             </div>
         </div>
@@ -1796,7 +2086,7 @@ function generateProfessionalTwoColumnTemplate() {
                         <span style="font-size:14px;color:#7f8c8d;">${exp.dates || 'Dates'}</span>
                     </div>
                     <div style="font-size:14px;color:#34495e;margin-bottom:10px;">
-                        ${exp.company || 'Company'} â€¢ ${exp.company ? (exp.location || resumeData.location || 'Location') : ''}
+                        ${exp.company || 'Company'} • ${exp.company ? (exp.location || resumeData.location || 'Location') : ''}
                     </div>
                     <ul style="padding-left:20px;margin:0;font-size:14px;line-height:1.5;color:#2c3e50;">
                         ${exp.desc ? exp.desc.split('\n').map(item => `<li style="margin-bottom:5px;">${item}</li>`).join('') : '<li>Add your responsibilities and achievements...</li>'}
@@ -1830,9 +2120,9 @@ function generateCleanHeaderTemplate() {
             <p style="font-size:18px;margin:10px 0;color:#7f8c8d;">${resumeData.title || 'Professional Title'}</p>
             
             <div style="margin-top:15px;font-size:14px;color:#555;">
-                <span>${resumeData.phone || '(123) 456-7890'}</span> â€¢ 
-                <span>${resumeData.email || 'email@example.com'}</span> â€¢ 
-                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#3498db;text-decoration:none" target="_blank">LinkedIn</a> â€¢ ` : ''}
+                <span>${resumeData.phone || '(123) 456-7890'}</span> • 
+                <span>${resumeData.email || 'email@example.com'}</span> • 
+                ${resumeData.linkedin ? `<a href="${resumeData.linkedin.startsWith('http') ? resumeData.linkedin : 'https://' + resumeData.linkedin}" style="color:#3498db;text-decoration:none" target="_blank">LinkedIn</a> • ` : ''}
                 ${resumeData.github ? `<a href="${resumeData.github.startsWith('http') ? resumeData.github : 'https://' + resumeData.github}" style="color:#3498db;text-decoration:none" target="_blank">Portfolio</a>` : ''}<br>
                 <span>${resumeData.location || 'City, State'}</span>
             </div>
@@ -1859,14 +2149,14 @@ function generateCleanHeaderTemplate() {
                     <h3 style="color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:5px;margin-bottom:15px;margin-top:30px;">KEY SKILLS</h3>
                     <div style="font-size:14px;">
                         ${(resumeData.skills || '').split(',').map(skill => `
-                            <div style="margin-bottom:5px">â€¢ ${skill.trim()}</div>
+                            <div style="margin-bottom:5px">• ${skill.trim()}</div>
                         `).join('')}
                     </div>
                     
                     ${resumeData.projects.length > 0 ? `
                         <h3 style="color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:5px;margin-bottom:15px;margin-top:30px;">CERTIFICATION</h3>
                         ${resumeData.projects.map((proj, index) => `
-                            <div style="font-size:14px;margin-bottom:8px;">â€¢ ${proj.name || 'Certification Name'} (${proj.tech || 'Issuing Body'})</div>
+                            <div style="font-size:14px;margin-bottom:8px;">• ${proj.name || 'Certification Name'} (${proj.tech || 'Issuing Body'})</div>
                         `).join('')}
                     ` : ''}
                 </div>
@@ -1906,8 +2196,8 @@ function generateAcademicStyleTemplate() {
             <p style="font-size:16px;margin:0 0 15px;color:#7f8c8d;text-transform:uppercase;">${resumeData.title || 'PROFESSIONAL TITLE'}</p>
             
             <div style="display:flex;justify-content:center;align-items:center;gap:15px;font-size:14px;color:#555;">
-                <span>${resumeData.phone || '(123) 456-7890'}</span> â€¢ 
-                <span>${resumeData.email || 'email@example.com'}</span> â€¢ 
+                <span>${resumeData.phone || '(123) 456-7890'}</span> • 
+                <span>${resumeData.email || 'email@example.com'}</span> • 
                 <span>${resumeData.location || 'City, State'}</span><br>
             </div>
             <div style="margin-top:8px;font-size:13px;">
@@ -1934,7 +2224,7 @@ function generateAcademicStyleTemplate() {
                 <h3 style="color:#2c3e50;font-size:16px;border-bottom:1px solid #bdc3c7;padding-bottom:3px;margin-bottom:15px;margin-top:30px;">SKILLS</h3>
                 <div style="font-size:14px;line-height:1.8;">
                     ${(resumeData.skills || '').split(',').slice(0, 12).map(skill => `
-                        <div>â€¢ ${skill.trim()}</div>
+                        <div>• ${skill.trim()}</div>
                     `).join('')}
                 </div>
                 
@@ -2026,10 +2316,9 @@ function checkATSCompatibility() {
 }
 
 // ============================================
-// GPA CALCULATOR - Added to Planning Page
+// GPA CALCULATOR
 // ============================================
 
-// Grade point scale (customize based on your university)
 const GRADE_POINTS = {
     'A': 4.0,
     'A-': 3.7,
@@ -2044,10 +2333,8 @@ const GRADE_POINTS = {
     'F': 0.0
 };
 
-// Store grades for each course
 let courseGrades = {};
 
-// Load saved grades from localStorage
 function loadSavedGrades() {
     const saved = localStorage.getItem('edumate_course_grades');
     if (saved) {
@@ -2055,12 +2342,10 @@ function loadSavedGrades() {
     }
 }
 
-// Save grades to localStorage
 function saveGrades() {
     localStorage.setItem('edumate_course_grades', JSON.stringify(courseGrades));
 }
 
-// Calculate GPA for all courses
 function calculateGPA() {
     const allCourseRows = document.querySelectorAll('.course-row');
     let totalWeightedPoints = 0;
@@ -2095,7 +2380,6 @@ function calculateGPA() {
     };
 }
 
-// Calculate CGPA (Cumulative GPA) - includes all courses ever taken
 function calculateCGPA() {
     const allCourseRows = document.querySelectorAll('.course-row');
     let totalWeightedPoints = 0;
@@ -2131,31 +2415,25 @@ function calculateCGPA() {
     };
 }
 
-// Update GPA display on the page
 function updateGPADisplay() {
     const gpaResult = calculateGPA();
     const cgpaResult = calculateCGPA();
     
-    // Update the current GPA in the stats card
     const gpaElement = document.getElementById('current-gpa');
     if (gpaElement) {
         gpaElement.textContent = gpaResult.gpa.toFixed(2);
     }
     
-    // Update or create GPA details in the right panel
     updateGPAPanel(gpaResult, cgpaResult);
 }
 
-// Create or update GPA panel in the right sidebar
 function updateGPAPanel(gpaResult, cgpaResult) {
     const rightPanel = document.querySelector('.right-panel');
     if (!rightPanel) return;
     
-    // Check if GPA panel already exists
     let gpaPanel = document.getElementById('gpa-panel');
     
     if (!gpaPanel) {
-        // Create GPA panel
         gpaPanel = document.createElement('div');
         gpaPanel.id = 'gpa-panel';
         gpaPanel.className = 'gpa-panel';
@@ -2168,7 +2446,6 @@ function updateGPAPanel(gpaResult, cgpaResult) {
             border: 1px solid #e2e8f0;
         `;
         
-        // Insert after progress block or at the end
         const progressBlock = rightPanel.querySelector('.progress-block');
         if (progressBlock) {
             progressBlock.insertAdjacentElement('afterend', gpaPanel);
@@ -2177,7 +2454,6 @@ function updateGPAPanel(gpaResult, cgpaResult) {
         }
     }
     
-    // Calculate grade distribution
     const distribution = calculateGradeDistribution();
     
     gpaPanel.innerHTML = `
@@ -2231,20 +2507,12 @@ function updateGPAPanel(gpaResult, cgpaResult) {
         </div>
     `;
     
-    // Add dark theme support
     if (document.body.classList.contains('dark-theme')) {
         gpaPanel.style.background = 'rgba(30, 41, 59, 0.9)';
         gpaPanel.style.border = '1px solid rgba(255,255,255,0.1)';
-        gpaPanel.querySelector('h4').style.color = 'var(--text-primary)';
-        const detailsDiv = gpaPanel.querySelector('#gpa-details div');
-        if (detailsDiv) {
-            detailsDiv.style.background = '#334155';
-            detailsDiv.style.color = 'var(--text-primary)';
-        }
     }
 }
 
-// Calculate grade distribution
 function calculateGradeDistribution() {
     const distribution = {
         'A': 0, 'A-': 0, 'B+': 0, 'B': 0, 'B-': 0,
@@ -2262,7 +2530,6 @@ function calculateGradeDistribution() {
     return distribution;
 }
 
-// Toggle GPA details panel
 function toggleGPADetails() {
     const details = document.getElementById('gpa-details');
     const button = document.querySelector('[onclick="toggleGPADetails()"] i');
@@ -2278,13 +2545,11 @@ function toggleGPADetails() {
     }
 }
 
-// Show grade selection modal for a course
 function showGradeModal(courseRow) {
     const courseId = courseRow.getAttribute('data-course-id');
     const courseName = courseRow.querySelector('.course-name').textContent.trim();
     const currentGrade = courseGrades[courseId] || '';
     
-    // Create modal
     const modal = document.createElement('div');
     modal.className = 'grade-modal';
     modal.style.cssText = `
@@ -2330,20 +2595,16 @@ function showGradeModal(courseRow) {
     document.body.appendChild(modal);
 }
 
-// Set grade for a course
 function setGrade(courseId, grade) {
     courseGrades[courseId] = grade;
     saveGrades();
     updateGPADisplay();
     
-    // Update course row to show grade
     const courseRow = document.querySelector(`[data-course-id="${courseId}"]`);
     if (courseRow) {
-        // Remove existing grade badge if any
         const existingBadge = courseRow.querySelector('.grade-badge');
         if (existingBadge) existingBadge.remove();
         
-        // Add grade badge
         const gradeBadge = document.createElement('span');
         gradeBadge.className = 'grade-badge';
         gradeBadge.style.cssText = `
@@ -2361,17 +2622,14 @@ function setGrade(courseId, grade) {
         nameSpan.appendChild(gradeBadge);
     }
     
-    // Close modal
     document.querySelector('.grade-modal')?.remove();
 }
 
-// Clear grade for a course
 function clearGrade(courseId) {
     delete courseGrades[courseId];
     saveGrades();
     updateGPADisplay();
     
-    // Remove grade badge
     const courseRow = document.querySelector(`[data-course-id="${courseId}"]`);
     if (courseRow) {
         const gradeBadge = courseRow.querySelector('.grade-badge');
@@ -2381,7 +2639,6 @@ function clearGrade(courseId) {
     document.querySelector('.grade-modal')?.remove();
 }
 
-// Get color for grade
 function getGradeColor(grade) {
     const colors = {
         'A': '#10b981', 'A-': '#10b981',
@@ -2392,10 +2649,8 @@ function getGradeColor(grade) {
     return colors[grade] || '#64748b';
 }
 
-// Add grade button to course rows
 function addGradeButtons() {
     document.querySelectorAll('.course-row').forEach(row => {
-        // Check if grade button already exists
         if (row.querySelector('.grade-btn')) return;
         
         const courseId = row.getAttribute('data-course-id');
@@ -2427,7 +2682,6 @@ function addGradeButtons() {
             actions.insertBefore(gradeBtn, actions.firstChild);
         }
         
-        // Add existing grade badge if any
         if (courseId && courseGrades[courseId]) {
             const grade = courseGrades[courseId];
             const gradeBadge = document.createElement('span');
@@ -2449,48 +2703,39 @@ function addGradeButtons() {
     });
 }
 
-// Modify the existing deleteCourse function to remove grade when course is deleted
 const originalDeleteCourse = window.deleteCourse;
 window.deleteCourse = function(button, subjectId) {
     const courseRow = button.closest('.course-row');
     const courseId = courseRow.getAttribute('data-course-id');
     
-    // Remove grade data
     if (courseId && courseGrades[courseId]) {
         delete courseGrades[courseId];
         saveGrades();
     }
     
-    // Call original function
     if (originalDeleteCourse) {
         originalDeleteCourse(button, subjectId);
     }
 };
 
-// Modify createSemesterWithSubjects to add grade buttons to new courses
 const originalCreateSemester = window.createSemesterWithSubjects;
 window.createSemesterWithSubjects = function() {
     originalCreateSemester();
-    // Add grade buttons to new courses after a short delay
     setTimeout(addGradeButtons, 500);
     updateGPADisplay();
 };
 
-// Modify addSubjectToSemester to add grade button to new course
 const originalAddSubject = window.addSubjectToSemester;
 window.addSubjectToSemester = function() {
     originalAddSubject();
-    // Add grade button to new course after a short delay
     setTimeout(addGradeButtons, 500);
     updateGPADisplay();
 };
 
 // ============================================
-// PLANNING PAGE JAVASCRIPT - COMPLETE WITH CREDIT CALCULATIONS
-// Subject database with locking system and automatic credit calculations
+// PLANNING PAGE
 // ============================================
 
-// Subject database for different semester types
 const subjectDatabase = {
     foundation: [
         { id: "cs101", name: "Intro to Programming", credits: 4, required: false, code: "CS 101", department: "Computer Science" },
@@ -2562,16 +2807,13 @@ const subjectDatabase = {
     ]
 };
 
-// Global variables for planning
 let planningSelectedSubjects = [];
 let planningCurrentSemester = null;
 let planningDropMode = false;
 let takenSubjects = new Set();
 
-// Target graduation credits (adjust based on your program)
 const TOTAL_REQUIRED_CREDITS = 128;
 
-// Initialize Planning Page
 function initPlanning() {
     loadPlanningData();
     updatePlanningDate();
@@ -2647,10 +2889,6 @@ function initializeSemesterCard(semester) {
     if (title) {
         title.addEventListener('blur', updateLastUpdated);
     }
-    
-    if (!semester.querySelector('.add-course-btn')) {
-        const actions = semester.querySelector('.semester-actions') || createSemesterActions(semester);
-    }
 }
 
 function createSemesterActions(semester) {
@@ -2712,32 +2950,26 @@ function createPathSwitch(careerTag, careerBadge) {
     
     previewBtn.addEventListener('click', () => {
         if (previewBtn.classList.contains('active')) return;
-        
-        careerBadge.style.transform = 'scale(0.9)';
-        setTimeout(() => careerBadge.style.transform = 'scale(1)', 150);
-        
         [previewBtn, planBtn].forEach(btn => btn.classList.remove('active'));
         previewBtn.classList.add('active');
         previewBtn.style.background = '#ffffff';
         previewBtn.style.color = '#1e293b';
         planBtn.style.background = 'transparent';
         planBtn.style.color = 'white';
-        careerBadge.innerHTML = 'ðŸ” Preview';
+        careerBadge.innerHTML = '🔍 Preview';
+        switchPlanningView('preview');
     });
     
     planBtn.addEventListener('click', () => {
         if (planBtn.classList.contains('active')) return;
-        
-        careerBadge.style.transform = 'scale(0.9)';
-        setTimeout(() => careerBadge.style.transform = 'scale(1)', 150);
-        
         [previewBtn, planBtn].forEach(btn => btn.classList.remove('active'));
         planBtn.classList.add('active');
         planBtn.style.background = '#ffffff';
         planBtn.style.color = '#1e293b';
         previewBtn.style.background = 'transparent';
         previewBtn.style.color = 'white';
-        careerBadge.innerHTML = 'ðŸ›¡ï¸ Cyber Security';
+        careerBadge.innerHTML = '🛡️ Cyber Security';
+        switchPlanningView('plan');
     });
     
     switchWrapper.appendChild(previewBtn);
@@ -2754,13 +2986,6 @@ function createPathSwitch(careerTag, careerBadge) {
     });
 }
 
-// ============================================
-// CREDIT CALCULATION FUNCTIONS
-// ============================================
-
-/**
- * Calculate total credits from all semesters
- */
 function calculateTotalCredits() {
     const allCourseRows = document.querySelectorAll('.course-row');
     let total = 0;
@@ -2778,37 +3003,26 @@ function calculateTotalCredits() {
     return total;
 }
 
-/**
- * Calculate earned credits (you can modify this logic based on your needs)
- * For now, we'll consider all added courses as "in progress" and none as earned
- * You can change this to mark completed semesters or courses as earned
- */
 function calculateEarnedCredits() {
     const earnedElement = document.getElementById('earned-credits');
     return earnedElement ? parseInt(earnedElement.textContent) || 0 : 0;
 }
 
-/**
- * Update all credit displays based on current courses
- */
 function updateAllCredits() {
     const totalCredits = calculateTotalCredits();
     const earnedCredits = calculateEarnedCredits();
     const remainingCredits = totalCredits - earnedCredits;
     
-    // Update total credits display
     const totalElement = document.getElementById('total-credits');
     if (totalElement) {
         totalElement.textContent = totalCredits;
     }
     
-    // Update remaining credits
     const remainingElement = document.getElementById('remaining-credits');
     const remainingDisplay = document.getElementById('remaining-credits-display');
     if (remainingElement) remainingElement.textContent = remainingCredits;
     if (remainingDisplay) remainingDisplay.textContent = remainingCredits;
     
-    // Update progress percentage
     const percentElement = document.getElementById('progress-percentage');
     const progressBar = document.getElementById('progress-bar');
     
@@ -2821,7 +3035,6 @@ function updateAllCredits() {
         }
     }
     
-    // Update courses left (optional)
     const coursesLeft = document.getElementById('courses-left');
     if (coursesLeft) {
         const avgCreditsPerCourse = 3;
@@ -2832,9 +3045,6 @@ function updateAllCredits() {
     updateLastUpdated();
 }
 
-/**
- * Update credits for a specific semester
- */
 function updateSemesterCredits(semesterElement) {
     const courseRows = semesterElement.querySelectorAll('.course-row');
     let total = 0;
@@ -2854,24 +3064,17 @@ function updateSemesterCredits(semesterElement) {
         setTimeout(() => creditSum.style.transform = 'scale(1)', 100);
     }
     
-    // Update global credits after semester update
     updateAllCredits();
 }
 
-/**
- * Calculate and update all credits (convenience function)
- */
 function calculateAllCredits() {
-    // Update each semester's credits
     document.querySelectorAll('.semester-item').forEach(sem => {
         updateSemesterCredits(sem);
     });
     
-    // Update global credits
     updateAllCredits();
 }
 
-// Modal Functions
 function openSubjectModal() {
     document.getElementById('semester-subjects-modal').style.display = 'flex';
     planningSelectedSubjects = [];
@@ -2895,7 +3098,6 @@ function closeAddSubjectModal() {
     planningCurrentSemester = null;
 }
 
-// Subject Selection Functions
 function loadSubjectsForSemester() {
     const semesterType = document.getElementById('semester-type').value;
     const subjectsList = document.getElementById('subjects-list');
@@ -2997,8 +3199,6 @@ function loadAvailableSubjectsForAdd() {
 function quickAddSubject(id, name, credits, code) {
     document.getElementById('new-subject-name').value = name;
     document.getElementById('new-subject-credits').value = credits;
-    document.getElementById('new-subject-id').value = id;
-    document.getElementById('new-subject-code').value = code;
 }
 
 function toggleSubject(id, name, credits, code, isChecked) {
@@ -3032,7 +3232,6 @@ function updateSelectedSubjectsDisplay() {
     }
 }
 
-// Create New Semester
 function createSemesterWithSubjects() {
     const semesterType = document.getElementById('semester-type');
     const selectedType = semesterType.options[semesterType.selectedIndex].text;
@@ -3131,29 +3330,22 @@ function createSemesterWithSubjects() {
     closeSubjectModal();
     showNotification(`Semester ${nextSemNum} created with ${planningSelectedSubjects.length} subjects`, 'success');
     
-    // Add grade buttons to new courses
     setTimeout(addGradeButtons, 500);
     updateGPADisplay();
     updateSemesterGPADisplays();
     addFinalGPADisplay();
 }
 
-// Add Subject to Semester
 function addSubjectToSemester() {
     if (!planningCurrentSemester) return;
     
     const subjectName = document.getElementById('new-subject-name').value.trim();
     const credits = document.getElementById('new-subject-credits').value;
-    const subjectId = document.getElementById('new-subject-id')?.value || 'custom_' + Date.now();
-    const subjectCode = document.getElementById('new-subject-code')?.value || 'CUSTOM';
+    const subjectId = 'custom_' + Date.now();
+    const subjectCode = 'CUSTOM';
     
     if (!subjectName) {
         alert('Please enter a subject name');
-        return;
-    }
-    
-    if (takenSubjects.has(subjectId)) {
-        alert('This subject has already been taken and cannot be added again');
         return;
     }
     
@@ -3195,14 +3387,12 @@ function addSubjectToSemester() {
     closeAddSubjectModal();
     showNotification(`Added "${subjectName}" to semester`, 'success');
     
-    // Add grade button to new course
     setTimeout(addGradeButtons, 500);
     updateGPADisplay();
     updateSemesterGPADisplays();
     addFinalGPADisplay();
 }
 
-// Delete Course
 function deleteCourse(button, subjectId) {
     const courseRow = button.closest('.course-row');
     const semesterItem = courseRow.closest('.semester-item');
@@ -3228,7 +3418,6 @@ function deleteCourse(button, subjectId) {
     }, 300);
 }
 
-// Drop Subjects Mode
 function showDropSubjectsMode(button) {
     const semesterItem = button.closest('.semester-item');
     const courseRows = semesterItem.querySelectorAll('.course-row');
@@ -3324,7 +3513,6 @@ function deleteSelectedCourses(semesterItem) {
     }
 }
 
-// Utility Functions
 function updateSemesterCounter() {
     const semCounter = document.getElementById('semester-counter');
     const currentSemesters = document.querySelectorAll('.semester-item').length;
@@ -3404,12 +3592,12 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Load Planning Data
-function loadPlanningData() {
-    if (window.loadPlanningData && window.loadPlanningData !== loadPlanningData) {
-        return window.loadPlanningData.apply(this, arguments);
-    }
-    console.warn('loadPlanningData is handled by backend_api.js');
+async function loadPlanningData() {
+    console.log('Loading planning data UI...');
+    // Render the UI components
+    loadCareerTimeline();
+    loadSummerCourses();
+    loadAdvisorSuggestions();
 }
 
 function savePlannerData() {
@@ -3426,7 +3614,6 @@ function saveCareerRoadmap() {
     console.warn('saveCareerRoadmap is handled by backend_api.js');
 }
 
-// Profile Completion Functions
 function calculateProfileCompletion() {
     const uname = sessionStorage.getItem('edumate_username');
     if (!uname || !users[uname]) return 0;
@@ -3454,7 +3641,6 @@ function updateProfileCompletion() {
     }
 }
 
-// Dashboard Functions
 function initDashboard() {
     updateDashboardDate();
     loadDashboardStats();
@@ -3477,24 +3663,6 @@ function loadDashboardStats() {
         return window.loadDashboardStats.apply(this, arguments);
     }
     console.warn('loadDashboardStats is handled by backend_api.js');
-}
-
-function calculateCareerScore() {
-    const uname = sessionStorage.getItem('edumate_username');
-    if (!uname || !users[uname]) return 65;
-    
-    const user = users[uname];
-    let score = 50;
-    
-    if (user.name?.trim()) score += 10;
-    if (user.email?.trim()) score += 10;
-    if (user.major?.trim()) score += 15;
-    if (user.skills?.trim()) score += 15;
-    if (user.profilePic && !user.profilePic.includes('placeholder')) score += 10;
-    if (localStorage.getItem('edumate_resume')) score += 10;
-    if (sessionStorage.getItem('edumate_ai_chats')) score += 5;
-    
-    return Math.min(score, 100);
 }
 
 function loadUpcomingEvents() {
@@ -3524,8 +3692,8 @@ function loadUpcomingEvents() {
 }
 
 function getEventIcon(type) {
-    const icons = { conference: 'ðŸŽ¤', fair: 'ðŸ¢', workshop: 'ðŸ“š', webinar: 'ðŸ’»' };
-    return icons[type] || 'ðŸ“…';
+    const icons = { conference: '🎤', fair: '🏢', workshop: '📚', webinar: '💻' };
+    return icons[type] || '📅';
 }
 
 function loadRecentActivity() {
@@ -3560,7 +3728,7 @@ function startDashboardAnimations() {
 function refreshDashboard() {
     const refreshBtn = document.querySelector('[onclick="refreshDashboard()"]');
     if (refreshBtn) {
-        refreshBtn.innerHTML = 'â³';
+        refreshBtn.innerHTML = '⏳';
         refreshBtn.disabled = true;
     }
     
@@ -3568,14 +3736,13 @@ function refreshDashboard() {
     
     setTimeout(() => {
         if (refreshBtn) {
-            refreshBtn.innerHTML = 'ðŸ”„';
+            refreshBtn.innerHTML = '🔄';
             refreshBtn.disabled = false;
         }
         showNotification('Dashboard refreshed successfully!', 'success');
     }, 1000);
 }
 
-// Courses Functions
 function initCoursesPage() {
     const searchInput = document.getElementById('course-search-input');
     if (searchInput) {
@@ -3588,73 +3755,6 @@ function initCoursesPage() {
     currentSearchResults = [];
 }
 
-function showCourseModal() {
-    const modalContent = `
-        <div class="course-modal-content">
-            <div style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0;">Add Custom Course</h3>
-                <button class="btn-icon" onclick="closeCourseModal()">âœ•</button>
-            </div>
-            
-            <div style="padding: 20px;">
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; color: var(--muted);">Course Title</label>
-                    <input id="new-course-title" class="input" placeholder="e.g., Advanced JavaScript">
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; color: var(--muted);">Platform/Provider</label>
-                    <input id="new-course-provider" class="input" placeholder="e.g., Udemy, Coursera">
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; color: var(--muted);">Category</label>
-                        <select id="new-course-category" class="input">
-                            <option value="tech">Technology</option>
-                            <option value="business">Business</option>
-                            <option value="soft-skills">Soft Skills</option>
-                            <option value="career">Career Development</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; color: var(--muted);">Duration</label>
-                        <input id="new-course-duration" class="input" placeholder="e.g., 8 weeks">
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 5px; color: var(--muted);">Course Link (Optional)</label>
-                    <input id="new-course-link" class="input" placeholder="https://...">
-                </div>
-                
-                <button class="btn" style="width: 100%;" onclick="addCustomCourse()">
-                    Add Course to My List
-                </button>
-            </div>
-        </div>
-    `;
-    
-    showModal(modalContent, 'course-modal');
-}
-
-function addCustomCourse() {
-    if (window.addCustomCourse && window.addCustomCourse !== addCustomCourse) {
-        return window.addCustomCourse.apply(this, arguments);
-    }
-    console.warn('addCustomCourse is handled by backend_api.js');
-}
-
-function saveCoursesData() {
-    localStorage.setItem('edumate_courses', JSON.stringify(coursesData));
-}
-
-function loadCoursesData() {
-    const saved = localStorage.getItem('edumate_courses');
-    if (saved) Object.assign(coursesData, JSON.parse(saved));
-}
-
-// Modal Functions
 function showModal(content, modalId) {
     const existingModal = document.getElementById(modalId);
     if (existingModal) existingModal.remove();
@@ -3671,7 +3771,6 @@ function closeCourseModal() {
     document.querySelectorAll('.course-modal').forEach(m => m.remove());
 }
 
-// Navigation
 const PROTECTED_PAGES = new Set(['dashboard','resume','Internships','xai','profile','courses','planning']);
 
 function navigateTo(id) {
@@ -3735,11 +3834,6 @@ function logActivity(action, text) {
     console.warn('logActivity is handled by backend_api.js');
 }
 
-// ============================================
-// ENHANCED GPA FUNCTIONS - Semester GPA Display
-// ============================================
-
-// Calculate semester GPAs
 function calculateSemesterGPAs() {
     const semesterGPAs = [];
     
@@ -3783,18 +3877,15 @@ function calculateSemesterGPAs() {
     return semesterGPAs;
 }
 
-// Update semester GPA displays in each semester card
 function updateSemesterGPADisplays() {
     const semesterGPAs = calculateSemesterGPAs();
     
     document.querySelectorAll('.semester-item').forEach((semester, index) => {
         const semesterData = semesterGPAs[index];
         
-        // Remove existing GPA display if any
         const existingGPA = semester.querySelector('.semester-gpa-display');
         if (existingGPA) existingGPA.remove();
         
-        // Create GPA display element
         const gpaDisplay = document.createElement('div');
         gpaDisplay.className = 'semester-gpa-display';
         
@@ -3838,7 +3929,6 @@ function updateSemesterGPADisplays() {
             `;
         }
         
-        // Insert after credit sum or at the end of semester head
         const semesterHead = semester.querySelector('.semester-head');
         if (semesterHead) {
             semesterHead.appendChild(gpaDisplay);
@@ -3846,15 +3936,13 @@ function updateSemesterGPADisplays() {
     });
 }
 
-// Get color based on GPA value
 function getGPAColor(gpa) {
-    if (gpa >= 3.7) return '#10b981'; // Excellent - Green
-    if (gpa >= 3.0) return '#3b82f6'; // Good - Blue
-    if (gpa >= 2.0) return '#f59e0b'; // Satisfactory - Orange
-    return '#ef4444'; // Poor - Red
+    if (gpa >= 3.7) return '#10b981';
+    if (gpa >= 3.0) return '#3b82f6';
+    if (gpa >= 2.0) return '#f59e0b';
+    return '#ef4444';
 }
 
-// Calculate final GPA (weighted average of all semesters)
 function calculateFinalGPA() {
     const semesterGPAs = calculateSemesterGPAs();
     let totalWeightedGPA = 0;
@@ -3879,12 +3967,10 @@ function calculateFinalGPA() {
     };
 }
 
-// Add final GPA display to the page
 function addFinalGPADisplay() {
     const rightPanel = document.querySelector('.right-panel');
     if (!rightPanel) return;
     
-    // Check if final GPA display already exists
     let finalGPADisplay = document.getElementById('final-gpa-display');
     
     if (!finalGPADisplay) {
@@ -3901,7 +3987,6 @@ function addFinalGPADisplay() {
             box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4);
         `;
         
-        // Insert at the beginning of right panel or after path card
         const pathCard = rightPanel.querySelector('.path-card');
         if (pathCard) {
             pathCard.insertAdjacentElement('afterend', finalGPADisplay);
@@ -3933,7 +4018,6 @@ function addFinalGPADisplay() {
     `;
 }
 
-// Toggle GPA section collapse/expand
 function toggleGPASection() {
     const content = document.querySelector('.gpa-main-content');
     const toggleBtn = document.querySelector('.gpa-toggle-btn i');
@@ -3947,22 +4031,6 @@ function toggleGPASection() {
     }
 }
 
-// Toggle grade distribution view
-function toggleGradeDistribution() {
-    const distribution = document.getElementById('grade-distribution-section');
-    const btn = document.querySelector('.view-details-btn');
-    
-    if (distribution.style.display === 'none') {
-        distribution.style.display = 'block';
-        btn.innerHTML = '<i class="fas fa-chart-bar"></i> Hide Grade Distribution';
-        updateGradeDistributionBars();
-    } else {
-        distribution.style.display = 'none';
-        btn.innerHTML = '<i class="fas fa-chart-bar"></i> View Grade Distribution';
-    }
-}
-
-// Quick grade all ungraded courses
 function quickGradeAll(grade) {
     const allCourseRows = document.querySelectorAll('.course-row');
     let gradedCount = 0;
@@ -3978,7 +4046,6 @@ function quickGradeAll(grade) {
     if (gradedCount > 0) {
         showNotification(`Set ${gradedCount} courses to grade ${grade}`, 'success');
         updateGPADisplay();
-        updateGradeDistributionBars();
         updateSemesterGPADisplays();
         addFinalGPADisplay();
     } else {
@@ -3986,91 +4053,159 @@ function quickGradeAll(grade) {
     }
 }
 
-// Update grade distribution bars
-function updateGradeDistributionBars() {
-    const distribution = calculateGradeDistribution();
-    const container = document.getElementById('grade-distribution-bars');
-    const totalCourses = Object.values(distribution).reduce((a, b) => a + b, 0);
+// ============================================
+// NEW PLANNING FEATURES - Plan/Preview Toggle, Timeline, Summer Courses, Advisor Chat
+// ============================================
+
+function switchPlanningView(view) {
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.planning-view').forEach(v => v.classList.remove('active'));
     
-    if (totalCourses === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 1rem;">No grades entered yet</p>';
-        return;
+    if (view === 'plan') {
+        document.querySelector('.toggle-btn:first-child').classList.add('active');
+        document.getElementById('planning-plan-view').classList.add('active');
+    } else {
+        document.querySelector('.toggle-btn:last-child').classList.add('active');
+        document.getElementById('planning-preview-view').classList.add('active');
+        loadCareerTimeline();
+        loadSummerCourses();
+        loadAdvisorSuggestions();
     }
-    
-    let html = '';
-    for (const [grade, count] of Object.entries(distribution)) {
-        if (count > 0) {
-            const percentage = (count / totalCourses) * 100;
-            const barClass = grade.charAt(0);
-            html += `
-                <div class="distribution-item">
-                    <span class="distribution-label">${grade}</span>
-                    <div class="distribution-bar-container">
-                        <div class="distribution-bar ${barClass}" style="width: ${percentage}%"></div>
-                    </div>
-                    <span class="distribution-count">${count}</span>
-                </div>
-            `;
-        }
-    }
-    
-    container.innerHTML = html;
 }
 
-// Add CSS animations
-if (!document.getElementById('notification-styles')) {
-    const style = document.createElement('style');
-    style.id = 'notification-styles';
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
+async function loadCareerTimeline() {
+    try {
+        const data = await apiFetch('/planning/timeline/me');
+        const timeline = document.getElementById('career-timeline');
+        if (!timeline) return;
+        
+        document.getElementById('preview-career-name').textContent = data.career_path || 'Your Career';
+        
+        timeline.innerHTML = data.semesters.map((s, i) => {
+            const statusClass = (s.status || 'upcoming').replace(' summer', '');
+            const isSummer = (s.status || '').includes('summer');
+            const circleClass = isSummer ? 'summer' : statusClass;
+            return `
+            <div class="timeline-node">
+                <div class="node-circle ${circleClass}">${i + 1}</div>
+                <div class="node-label">
+                    <div class="node-semester">${s.name}</div>
+                    <div class="node-courses">${s.total_credits} credits</div>
+                    <div class="node-status ${statusClass}-status">${statusClass === 'completed' ? '✅ Done' : statusClass === 'current' ? '🔄 Active' : isSummer ? '☀️ Summer' : '📅 Planned'}</div>
+                </div>
+            </div>`;
+        }).join('');
+        
+        const total = data.semesters.reduce((a, s) => a + s.total_credits, 0);
+        const earned = data.semesters.reduce((a, s) => a + s.completed_credits, 0);
+        const done = data.semesters.filter(s => s.status === 'completed').length;
+        
+        document.getElementById('path-summary-row').innerHTML = `
+            <div class="path-summary-card"><h4>📊 Progress</h4><div class="summary-value">${data.total_progress}%</div></div>
+            <div class="path-summary-card"><h4>✅ Earned</h4><div class="summary-value">${earned}</div></div>
+            <div class="path-summary-card"><h4>📅 Remaining</h4><div class="summary-value">${total - earned}</div></div>
+            <div class="path-summary-card"><h4>🎯 Done</h4><div class="summary-value">${done}/${data.semesters.length}</div></div>`;
+    } catch (e) {
+        console.error('Failed to load timeline:', e);
+    }
+}
+
+async function loadSummerCourses() {
+    try {
+        const data = await apiFetch('/planning/summer-courses/me');
+        const container = document.getElementById('summer-course-list');
+        if (!container) return;
+        
+        if (!data.length) {
+            container.innerHTML = '<p style="color:#92400e;font-size:0.9rem;">No summer courses recommended at this time.</p>';
+            return;
         }
         
-        .semester-gpa-display {
-            margin-top: 8px;
-            animation: fadeIn 0.3s ease;
-        }
-        
-        .semester-gpa-badge {
-            transition: all 0.2s ease;
-        }
-        
-        .semester-gpa-badge:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        
-        .final-gpa-display {
-            animation: slideDown 0.5s ease;
-        }
-        
-        .final-gpa-display:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px -5px rgba(139, 92, 246, 0.5);
-        }
-        
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
+        container.innerHTML = data.map(c => `
+            <div class="summer-course-item">
+                <div class="summer-course-info">
+                    <span class="summer-course-code">${c.code}</span>
+                    <span class="summer-course-name">${c.name}</span>
+                    <span class="summer-course-credits">(${c.credits} cr)</span>
+                    ${!c.prerequisite_met ? `<span style="color:#ef4444;font-size:0.7rem;">⚠️ Req: ${c.prerequisite?.code || 'N/A'}</span>` : ''}
+                </div>
+                <button class="request-this-btn" onclick="requestSummerCourse(${c.id}, '${c.name}')">📝 Request</button>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load summer courses:', e);
+    }
+}
+
+async function requestSummerCourse(courseId, courseName) {
+    try {
+        await apiFetch(`/planning/summer-courses/request?course_id=${courseId}`, { method: 'POST' });
+        showNotification(`Request for "${courseName}" submitted!`, 'success');
+        document.querySelectorAll('.request-this-btn').forEach(b => {
+            if (b.textContent.includes('Request')) { b.textContent = '✅ Requested'; b.classList.add('requested'); b.disabled = true; }
+        });
+    } catch (e) {
+        showNotification('Failed to submit request', 'error');
+    }
+}
+
+function viewAllSummerCourses() {
+    switchPlanningView('preview');
+    setTimeout(() => sendAdvisorQuickMessage('Tell me about all available summer courses'), 300);
+}
+
+async function sendAdvisorMessage() {
+    const input = document.getElementById('advisor-chat-input');
+    const container = document.getElementById('advisor-chat-messages');
+    if (!input || !container) return;
+    const msg = input.value.trim();
+    if (!msg) return;
+    
+    input.value = '';
+    appendAdvisorBubble(container, 'user', msg);
+    
+    try {
+        const data = await apiFetch('/planning/advisor/chat', {
+            method: 'POST',
+            body: JSON.stringify({ message: msg, channel: 'planning_advisor' })
+        });
+        appendAdvisorBubble(container, 'ai', data.message);
+        updateAdvisorSuggestions(data.suggestions || []);
+    } catch (e) {
+        appendAdvisorBubble(container, 'ai', 'Sorry, I could not process your request. Please try again.');
+    }
+}
+
+function sendAdvisorQuickMessage(msg) {
+    document.getElementById('advisor-chat-input').value = msg;
+    sendAdvisorMessage();
+}
+
+function appendAdvisorBubble(container, type, text) {
+    const div = document.createElement('div');
+    div.className = `advisor-message ${type}`;
+    div.innerHTML = `
+        <div class="advisor-avatar ${type === 'ai' ? 'ai-avatar' : 'user-avatar'}">${type === 'ai' ? '🤖' : '👤'}</div>
+        <div class="advisor-bubble">${text.replace(/\n/g, '<br>')}</div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function updateAdvisorSuggestions(suggestions) {
+    const container = document.getElementById('advisor-suggestions');
+    if (!container) return;
+    container.innerHTML = suggestions.map(s => 
+        `<span class="suggestion-chip" onclick="sendAdvisorQuickMessage('${s}')">${s}</span>`
+    ).join('');
+}
+
+function loadAdvisorSuggestions() {
+    updateAdvisorSuggestions([
+        'What courses should I take next?',
+        'Are there summer courses?',
+        'Show graduation timeline',
+        'Check my prerequisites'
+    ]);
 }
 
 // DOM Ready
@@ -4086,268 +4221,45 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
 });
 
-// Export functions
+// ============================================
+// EXPORT FUNCTIONS
+// ============================================
+window.switchPlanningView = switchPlanningView;
+window.sendAdvisorMessage = sendAdvisorMessage;
+window.sendAdvisorQuickMessage = sendAdvisorQuickMessage;
+window.requestSummerCourse = requestSummerCourse;
+window.viewAllSummerCourses = viewAllSummerCourses;
+window.apiFetch = apiFetch;
 window.navigateTo = navigateTo;
-window.initCoursesPage = initCoursesPage;
-window.showCourseModal = showCourseModal;
-window.addCustomCourse = addCustomCourse;
-window.attemptLogin = attemptLogin;
-window.firebaseLogin = firebaseLogin;
-window.startRegistration = startRegistration;
-window.previewInfoAvatar = previewInfoAvatar;
-window.completeRegistration = completeRegistration;
-window.changeProfileAvatar = changeProfileAvatar;
-window.saveProfileEdits = saveProfileEdits;
+window.initPlanning = initPlanning;
 window.toggleAIPopup = toggleAIPopup;
-window.sendAIChatMessage = sendAIChatMessage;
-window.sendAIPopupMessage = sendAIPopupMessage;
-window.showResumeForm = showResumeForm;
+window.signOut = signOut;
+window.refreshDashboard = refreshDashboard;
+window.searchCourses = searchCourses;
+window.quickSearch = quickSearch;
+window.loadInternshipsByPosition = loadInternshipsByPosition;
+window.generateResumePreview = generateResumePreview;
+window.downloadResumePDF = downloadResumePDF;
+window.saveResumeData = saveResumeData;
 window.addEducation = addEducation;
 window.addExperience = addExperience;
 window.addProject = addProject;
-window.saveResumeData = saveResumeData;
-window.generateResumePreview = generateResumePreview;
-window.downloadResumePDF = downloadResumePDF;
-window.checkATSCompatibility = checkATSCompatibility;
-window.signOut = signOut;
-window.refreshDashboard = refreshDashboard;
-window.logActivity = logActivity;
-window.initDashboard = initDashboard;
-window.loadInternshipsByPosition = loadInternshipsByPosition;
-window.viewSavedInternships = viewSavedInternships;
-window.retryInternshipsearch = retryInternshipsearch;
-window.saveJob = saveJob;
-window.updateInternshipstatus = updateInternshipstatus;
-window.removeSavedJob = removeSavedJob;
-window.searchCourses = searchCourses;
-window.quickSearch = quickSearch;
-window.saveCustomCourse = saveCustomCourse;
-window.removeCustomCourse = removeCustomCourse;
-window.viewSavedCourses = viewSavedCourses;
-
-// Planning functions
-window.initPlanning = initPlanning;
-window.switchPlanningTab = function(tabId) {
-    document.querySelectorAll('.planning-tab, .planning-tab-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById(`${tabId}-planner`)?.classList.add('active');
-    document.querySelector(`[data-tab="${tabId}"]`)?.classList.add('active');
-    logActivity('viewed', `Viewed ${tabId} planning tab`);
-};
-window.savePlannerData = savePlannerData;
-window.saveCareerRoadmap = saveCareerRoadmap;
-window.addGoal = function() {
-    const container = document.getElementById('goals-container');
-    if (!container) return;
-    
-    const goalId = 'goal_' + Date.now();
-    const goalDiv = document.createElement('div');
-    goalDiv.className = 'goal-item';
-    goalDiv.setAttribute('data-goal-id', goalId);
-    
-    goalDiv.innerHTML = `
-        <div style="display:flex;align-items:center;gap:10px;flex:1">
-            <input type="checkbox" onchange="toggleGoalComplete(this)" id="${goalId}">
-            <div style="flex:1">
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                    <input type="text" class="input" placeholder="Goal description" style="flex:1;margin-right:10px;" value="New Goal">
-                    <input type="text" class="input" placeholder="Due date" style="width:120px;" value="Dec 2024">
-                </div>
-                <div class="goal-progress-container">
-                    <div class="goal-progress-bar" style="width:0%"></div>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:0.85rem">
-                    <span>Progress: 0%</span>
-                    <div>
-                        <button class="link-btn" style="color:var(--primary);padding:0 5px;" onclick="updateGoalProgress('${goalId}', 10)">+10%</button>
-                        <button class="link-btn" style="color:var(--error);padding:0 5px;" onclick="this.closest('.goal-item').remove(); saveGoals();">Remove</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    container.appendChild(goalDiv);
-    window.saveGoals = saveGoals;
-    logActivity('added', 'Added new goal');
-};
-window.toggleGoalComplete = function(checkbox) {
-    const goalItem = checkbox.closest('.goal-item');
-    if (checkbox.checked) {
-        goalItem.style.opacity = '0.6';
-        const progressBar = goalItem.querySelector('.goal-progress-bar');
-        if (progressBar) {
-            progressBar.style.width = '100%';
-            const span = goalItem.querySelector('span:first-of-type');
-            if (span) span.textContent = 'Progress: 100%';
-        }
-    } else {
-        goalItem.style.opacity = '1';
-    }
-    saveGoals();
-};
-window.updateGoalProgress = function(goalId, increment) {
-    const goalItem = document.querySelector(`[data-goal-id="${goalId}"]`);
-    if (!goalItem) return;
-    
-    const progressBar = goalItem.querySelector('.goal-progress-bar');
-    const progressSpan = goalItem.querySelector('span:first-of-type');
-    
-    if (progressBar && progressSpan) {
-        let current = parseInt(progressBar.style.width) || 0;
-        let newWidth = Math.min(current + increment, 100);
-        progressBar.style.width = newWidth + '%';
-        progressSpan.textContent = `Progress: ${newWidth}%`;
-        
-        if (newWidth >= 100) {
-            const checkbox = goalItem.querySelector('input[type="checkbox"]');
-            if (checkbox) checkbox.checked = true;
-            goalItem.style.opacity = '0.6';
-        }
-    }
-    saveGoals();
-};
-window.addSkillPlan = function() {
-    const container = document.getElementById('skills-container');
-    if (!container) return;
-    
-    const skillDiv = document.createElement('div');
-    skillDiv.className = 'skill-item';
-    
-    skillDiv.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div>
-                <input type="text" class="input" placeholder="Skill name" style="width:200px;margin-right:10px;" value="New Skill">
-                <span style="color:var(--muted);font-size:0.85rem;margin-left:10px">Target: 
-                    <input type="text" class="input" placeholder="Date" style="width:100px;" value="Dec 2024">
-                </span>
-            </div>
-            <select class="input skill-level" style="width:120px;">
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-            </select>
-        </div>
-        <div class="course-progress">
-            <div class="course-progress-fill" style="width:0%"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:0.85rem">
-            <span>0% complete</span>
-            <div>
-                <button class="link-btn" style="color:var(--primary);padding:0 5px;" onclick="updateSkillProgress(this, 10)">+10%</button>
-                <button class="link-btn" style="color:var(--error);padding:0 5px;" onclick="this.closest('.skill-item').remove(); saveSkills();">Remove</button>
-            </div>
-        </div>
-    `;
-    
-    container.appendChild(skillDiv);
-    window.saveSkills = saveSkills;
-    logActivity('added', 'Added new skill to track');
-};
-window.updateSkillProgress = function(button, increment) {
-    const skillItem = button.closest('.skill-item');
-    if (!skillItem) return;
-    
-    const progressBar = skillItem.querySelector('.course-progress-fill');
-    const progressSpan = skillItem.querySelector('span:first-of-type');
-    
-    if (progressBar && progressSpan) {
-        let current = parseInt(progressBar.style.width) || 0;
-        let newWidth = Math.min(current + increment, 100);
-        progressBar.style.width = newWidth + '%';
-        progressSpan.textContent = `${newWidth}% complete`;
-    }
-    saveSkills();
-};
-window.saveAllPlanningData = function() {
-    savePlannerData();
-    saveCareerRoadmap();
-    saveGoals();
-    saveSkills();
-    showNotification('All planning data saved!', 'success');
-    logActivity('saved', 'Saved all planning data');
-};
-window.calculateSemesterCredits = function() {
-    const semesters = [1, 2, 3, 4];
-    let total = 0;
-    semesters.forEach(sem => {
-        let semTotal = 0;
-        for (let i = 1; i <= 3; i++) {
-            const creditSelect = document.getElementById(`sem${sem}-credits${i}`);
-            if (creditSelect) semTotal += parseInt(creditSelect.value) || 0;
-        }
-        const totalElement = document.getElementById(`sem${sem}-total`);
-        if (totalElement) totalElement.textContent = semTotal;
-        total += semTotal;
-    });
-    document.getElementById('total-credits').textContent = total;
-};
-window.loadPlanningData = loadPlanningData;
-window.saveGoals = function() {
-    const goals = [];
-    document.querySelectorAll('#goals-container .goal-item').forEach(goalItem => {
-        const checkbox = goalItem.querySelector('input[type="checkbox"]');
-        const goalInput = goalItem.querySelector('input[type="text"]:first-of-type');
-        const dueDate = goalItem.querySelectorAll('input[type="text"]')[1];
-        const progressBar = goalItem.querySelector('.goal-progress-bar');
-        
-        goals.push({
-            id: goalItem.dataset.goalId,
-            text: goalInput ? goalInput.value : '',
-            dueDate: dueDate ? dueDate.value : '',
-            completed: checkbox ? checkbox.checked : false,
-            progress: progressBar ? parseInt(progressBar.style.width) || 0 : 0
-        });
-    });
-    localStorage.setItem('edumate_goals', JSON.stringify(goals));
-};
-window.saveSkills = function() {
-    const skills = [];
-    document.querySelectorAll('#skills-container .skill-item').forEach(skillItem => {
-        const nameInput = skillItem.querySelector('input[type="text"]:first-of-type');
-        const dateInput = skillItem.querySelectorAll('input[type="text"]')[1];
-        const levelSelect = skillItem.querySelector('.skill-level');
-        const progressBar = skillItem.querySelector('.course-progress-fill');
-        
-        skills.push({
-            name: nameInput ? nameInput.value : '',
-            targetDate: dateInput ? dateInput.value : '',
-            level: levelSelect ? levelSelect.value : 'beginner',
-            progress: progressBar ? parseInt(progressBar.style.width) || 0 : 0
-        });
-    });
-    localStorage.setItem('edumate_skills', JSON.stringify(skills));
-};
-
-// Planning modal functions
+window.showResumeForm = showResumeForm;
+window.changeProfileAvatar = changeProfileAvatar;
+window.saveProfileEdits = saveProfileEdits;
+window.attemptLogin = attemptLogin;
+window.firebaseLogin = firebaseLogin;
+window.startRegistration = startRegistration;
+window.completeRegistration = completeRegistration;
+window.showNotification = showNotification;
 window.closeSubjectModal = closeSubjectModal;
 window.closeAddSubjectModal = closeAddSubjectModal;
-window.loadSubjectsForSemester = loadSubjectsForSemester;
-window.toggleSubject = toggleSubject;
 window.createSemesterWithSubjects = createSemesterWithSubjects;
 window.showAddSubjectModal = showAddSubjectModal;
 window.addSubjectToSemester = addSubjectToSemester;
 window.deleteCourse = deleteCourse;
-window.showDropSubjectsMode = showDropSubjectsMode;
-window.deleteSelectedCourses = deleteSelectedCourses;
-window.quickAddSubject = quickAddSubject;
-window.updateAllCredits = updateAllCredits;
-window.calculateAllCredits = calculateAllCredits;
-
-// GPA functions
-window.showGradeModal = showGradeModal;
+window.toggleGPASection = toggleGPASection;
+window.quickGradeAll = quickGradeAll;
 window.setGrade = setGrade;
 window.clearGrade = clearGrade;
-window.toggleGPADetails = toggleGPADetails;
-window.toggleGPASection = toggleGPASection;
-window.toggleGradeDistribution = toggleGradeDistribution;
-window.quickGradeAll = quickGradeAll;
-window.calculateGPA = calculateGPA;
-window.calculateCGPA = calculateCGPA;
-window.calculateFinalGPA = calculateFinalGPA;
-window.updateGPADisplay = updateGPADisplay;
-window.updateSemesterGPADisplays = updateSemesterGPADisplays;
-window.addFinalGPADisplay = addFinalGPADisplay;
-window.showNotification = showNotification;
-window.alert = function (message) {
-    showNotification(message, 'info');
-};
+window.alert = function(m) { showNotification(m, 'info'); };

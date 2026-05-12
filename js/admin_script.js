@@ -852,6 +852,89 @@ function logSecurityEvent() {}
 function resetLoginAttempts() {}
 function registerFailedLogin() {}
 
+async function loadRequestsData() {
+    try {
+        const requests = await adminApi('/admin/requests');
+        const tbody = document.getElementById('requests-table-body');
+        if (!tbody) return;
+        
+        if (!requests || requests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">No requests found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = requests.map(req => {
+            const date = new Date(req.date);
+            const formattedDate = isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
+            
+            let statusColor = 'var(--muted)';
+            if (req.status === 'Approved') statusColor = '#10B981';
+            if (req.status === 'Rejected') statusColor = '#EF4444';
+            if (req.status === 'Pending') statusColor = '#F59E0B';
+            
+            return `
+                <tr>
+                    <td>${escapeHtml(req.student)}</td>
+                    <td>${escapeHtml(req.course)}</td>
+                    <td>${formattedDate}</td>
+                    <td style="font-weight:600;color:${statusColor}">${escapeHtml(req.status)}</td>
+                    <td>
+                        <select class="input" style="padding:4px;font-size:0.85rem;" onchange="updateRequestStatus(${req.id}, this.value)">
+                            <option value="">Update...</option>
+                            <option value="Approved">Approve</option>
+                            <option value="Rejected">Reject</option>
+                            <option value="Pending">Pending</option>
+                        </select>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        notify(error.message || 'Failed to load requests', 'error');
+    }
+}
+
+async function updateRequestStatus(reqId, newStatus) {
+    if (!newStatus) return;
+    try {
+        await adminApi(`/admin/requests/${reqId}/status?status=${encodeURIComponent(newStatus)}`, { method: 'POST' });
+        notify('Request status updated', 'success');
+        loadRequestsData();
+    } catch (error) {
+        notify(error.message || 'Failed to update request status', 'error');
+    }
+}
+
+
+async function loadAiChatsData() {
+    try {
+        const chats = await adminApi('/admin/ai-chats');
+        const tbody = document.getElementById('ai-chats-table-body');
+        if (!tbody) return;
+        
+        if (!chats || chats.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--muted)">No AI chats found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = chats.map(chat => {
+            const date = new Date(chat.date);
+            const formattedDate = isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
+            
+            return `
+                <tr>
+                    <td>${escapeHtml(chat.student_id)}</td>
+                    <td>${escapeHtml(chat.user_message)}</td>
+                    <td>${escapeHtml(chat.assistant_message)}</td>
+                    <td>${formattedDate}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        notify(error.message || 'Failed to load AI chats', 'error');
+    }
+}
+
 function runPageInit(id) {
     if (id === 'dashboard') loadAllDashboardData();
     if (id === 'users') loadUsersData();
@@ -859,11 +942,13 @@ function runPageInit(id) {
     if (id === 'security') loadSecurityData();
     if (id === 'logs') loadSystemLogs();
     if (id === 'settings') loadAdminSettings();
+    if (id === 'requests') loadRequestsData();
+    if (id === 'ai_chats') loadAiChatsData();
 }
 
 function navigateTo(id) {
     const logged = sessionStorage.getItem('edumate_admin_logged') === '1';
-    const protectedPages = new Set(['dashboard', 'users', 'analytics', 'security', 'logs', 'settings']);
+    const protectedPages = new Set(['dashboard', 'users', 'analytics', 'security', 'logs', 'settings', 'requests', 'ai_chats']);
     if (protectedPages.has(id) && !logged) {
         id = 'login';
     }
@@ -936,3 +1021,7 @@ window.deleteAdminUser = deleteAdminUser;
 window.logSecurityEvent = logSecurityEvent;
 window.resetLoginAttempts = resetLoginAttempts;
 window.registerFailedLogin = registerFailedLogin;
+window.loadRequestsData = loadRequestsData;
+window.updateRequestStatus = updateRequestStatus;
+window.loadAiChatsData = loadAiChatsData;
+
