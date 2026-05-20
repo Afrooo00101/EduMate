@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, Integer, String, Text
+from sqlalchemy.dialects.mysql import INTEGER as UNSIGNED_INTEGER
 
 from app.database import Base
 from app.models.base import TimestampMixin
@@ -7,7 +8,7 @@ from app.models.base import TimestampMixin
 class SecurityAudit(TimestampMixin, Base):
     __tablename__ = 'security_audit_logs'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UNSIGNED_INTEGER(unsigned=True), primary_key=True, index=True)
     ip_address = Column(String(64), nullable=False, index=True)
     event_type = Column(String(100), nullable=False, index=True)
     identifier = Column(String(255))
@@ -17,7 +18,7 @@ class SecurityAudit(TimestampMixin, Base):
 class PlatformSetting(TimestampMixin, Base):
     __tablename__ = 'platform_settings'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UNSIGNED_INTEGER(unsigned=True), primary_key=True, index=True)
     maintenance_mode = Column(Boolean, nullable=False, default=False)
     session_timeout_minutes = Column(Integer, nullable=False, default=30)
     max_login_attempts = Column(Integer, nullable=False, default=5)
@@ -27,7 +28,7 @@ class PlatformSetting(TimestampMixin, Base):
 class BlockedIPRule(TimestampMixin, Base):
     __tablename__ = 'blocked_ip_rules'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UNSIGNED_INTEGER(unsigned=True), primary_key=True, index=True)
     ip_address = Column(String(64), nullable=False, unique=True, index=True)
     reason = Column(Text)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -36,7 +37,7 @@ class BlockedIPRule(TimestampMixin, Base):
 class BlockedCountryRule(TimestampMixin, Base):
     __tablename__ = 'blocked_country_rules'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UNSIGNED_INTEGER(unsigned=True), primary_key=True, index=True)
     country_name = Column(String(120), nullable=False, unique=True, index=True)
     notes = Column(Text)
     is_active = Column(Boolean, nullable=False, default=True)

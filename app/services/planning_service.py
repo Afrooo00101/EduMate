@@ -1,10 +1,11 @@
 import json
 from typing import Optional, List
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
     Student, StudentCourse, StudyPlan, Course, CoursePrerequisite,
-    CourseOffering, PlannerState, AcademicRule, Major, AIChatMessage, Request
+    CourseOffering, PlannerState, AcademicRule, Major, AIChatMessage, CourseRequest
 )
 from app.schemas.planning import (
     GPASummary, PlannerStateRead, PlannerStateUpsert,
@@ -37,6 +38,21 @@ class PlanningService:
     
     def __init__(self, db: Session):
         self.db = db
+
+    def _next_student_course_id(self) -> int:
+        return (self.db.query(func.max(StudentCourse.id)).scalar() or 0) + 1
+
+    def _persist_student_gpa(self, student_id: int, gpa: float) -> None:
+        student = self.db.query(Student).filter(Student.id == student_id).first()
+        if not student:
+            return
+
+        rounded_gpa = round(float(gpa or 0.0), 2)
+        current_gpa = round(float(student.gpa or 0.0), 2)
+        if current_gpa != rounded_gpa:
+            student.gpa = rounded_gpa
+            self.db.add(student)
+            self.db.commit()
     
     # ==============================
     # PLANNER STATE (ORIGINAL + ENHANCED)
@@ -48,7 +64,8 @@ class PlanningService:
             PlannerState.student_id == student_id
         ).first()
         if not state:
-            state = PlannerState(student_id=student_id)
+            next_id = (self.db.query(func.max(PlannerState.id)).scalar() or 0) + 1
+            state = PlannerState(id=next_id, student_id=student_id)
             self.db.add(state)
             self.db.commit()
             self.db.refresh(state)
@@ -64,16 +81,99 @@ class PlanningService:
         self.db.refresh(state)
         return state
     
+    def remove_enrollment(self, student_id: int, course_id: int) -> bool:
+        """Remove a student course record"""
+        record = self.db.query(StudentCourse).filter(
+            StudentCourse.student_id == student_id,
+            StudentCourse.course_id == course_id
+        ).first()
+        
+        if record:
+            self.db.delete(record)
+            self.db.commit()
+            self.calculate_gpa_summary(student_id)
+            return True
+        return False
+
+    def update_enrollment(self, student_id: int, course_id: int, status: str, grade: str = None) -> bool:
+        """Update or create a student course status and grade."""
+        record = self.db.query(StudentCourse).filter(
+            StudentCourse.student_id == student_id,
+            StudentCourse.course_id == course_id
+        ).first()
+
+        normalized_grade = grade.strip() if isinstance(grade, str) else grade
+        if normalized_grade == "":
+            normalized_grade = None
+
+        if not record:
+            course = self.db.query(Course).filter(Course.id == course_id).first()
+            if not course:
+                return False
+
+            study_plan = self.db.query(StudyPlan).filter(StudyPlan.course_id == course_id).first()
+            semester = study_plan.semester if study_plan and study_plan.semester else "Completed"
+            record = StudentCourse(
+                id=self._next_student_course_id(),
+                student_id=student_id,
+                course_id=course_id,
+                semester=semester,
+                status=status,
+            )
+
+        record.status = status
+        if normalized_grade is not None or status != 'completed':
+            record.grade = normalized_grade
+        self.db.add(record)
+        self.db.commit()
+        self.calculate_gpa_summary(student_id)
+        return True
+
+    def bulk_enroll(self, student_id: int, enrollments: List[dict]) -> bool:
+        """Create multiple course enrollments at once"""
+        for data in enrollments:
+            course_id = data.get('course_id')
+            semester = data.get('semester')
+            status = data.get('status', 'planned')
+            
+            # Check if enrollment already exists
+            existing = self.db.query(StudentCourse).filter(
+                StudentCourse.student_id == student_id,
+                StudentCourse.course_id == course_id
+            ).first()
+            
+            if existing:
+                existing.semester = semester
+                existing.status = status
+            else:
+                new_enrollment = StudentCourse(
+                    id=self._next_student_course_id(),
+                    student_id=student_id,
+                    course_id=course_id,
+                    semester=semester,
+                    status=status
+                )
+                self.db.add(new_enrollment)
+        
+        self.db.commit()
+        self.calculate_gpa_summary(student_id)
+        return True
+    
     # ==============================
     # GPA CALCULATION (ORIGINAL + ENHANCED)
     # ==============================
     
     def calculate_gpa_summary(self, student_id: int) -> GPASummary:
-        """Calculate GPA summary from grades stored in planner state"""
-        state = self.get_or_create_state(student_id)
-        grades = json.loads(state.grades_json or '{}') if state.grades_json else {}
-        
-        if not grades:
+        """Calculate GPA from completed, graded student_courses only."""
+        student_courses = self.db.query(StudentCourse).filter(
+            StudentCourse.student_id == student_id,
+            StudentCourse.status == 'completed',
+            StudentCourse.grade.isnot(None)
+        ).all()
+
+        graded_courses = [sc for sc in student_courses if sc.grade in GRADE_POINTS]
+        if not graded_courses:
+            self._persist_student_gpa(student_id, 0.0)
             return GPASummary(
                 term_gpa=0.0,
                 cumulative_gpa=0.0,
@@ -82,21 +182,25 @@ class PlanningService:
             )
         
         distribution = {}
-        total_points = 0.0
-        count = 0
+        total_weighted_points = 0.0
+        total_credits = 0
         
-        for grade in grades.values():
-            if grade in GRADE_POINTS:
-                distribution[grade] = distribution.get(grade, 0) + 1
-                total_points += GRADE_POINTS[grade]
-                count += 1
+        all_courses = self._get_all_courses_dict()
         
-        gpa = round(total_points / count, 2) if count else 0.0
+        for sc in graded_courses:
+            distribution[sc.grade] = distribution.get(sc.grade, 0) + 1
+            course = all_courses.get(sc.course_id)
+            credits = course.credits if course else 3
+            total_weighted_points += GRADE_POINTS[sc.grade] * credits
+            total_credits += credits
+        
+        gpa = round(total_weighted_points / total_credits, 2) if total_credits else 0.0
+        self._persist_student_gpa(student_id, gpa)
         
         return GPASummary(
             term_gpa=gpa,
             cumulative_gpa=gpa,
-            total_graded_courses=count,
+            total_graded_courses=len(graded_courses),
             distribution=distribution
         )
     
@@ -104,6 +208,7 @@ class PlanningService:
         """Calculate GPA from StudentCourse records (database-based)"""
         student_courses = self.db.query(StudentCourse).filter(
             StudentCourse.student_id == student_id,
+            StudentCourse.status == 'completed',
             StudentCourse.grade.isnot(None)
         ).all()
         
@@ -146,6 +251,7 @@ class PlanningService:
         """Calculate detailed GPA with quality points and full distribution"""
         query = self.db.query(StudentCourse).filter(
             StudentCourse.student_id == student_id,
+            StudentCourse.status == 'completed',
             StudentCourse.grade.isnot(None)
         )
         
@@ -517,7 +623,7 @@ class PlanningService:
         if not course:
             raise ValueError(f"Course {course_id} not found")
         
-        request_entry = Request(
+        request_entry = CourseRequest(
             student=student.student_code if student else str(student_id),
             course=course_name or course.name
         )
@@ -540,8 +646,8 @@ class PlanningService:
         if not student:
             return []
         
-        requests = self.db.query(Request).filter(
-            Request.student == student.student_code
+        requests = self.db.query(CourseRequest).filter(
+            CourseRequest.student == student.student_code
         ).all()
         
         return [
@@ -585,10 +691,14 @@ class PlanningService:
         
         gpa_summary = self.calculate_gpa_summary(student_id)
         
+        # Ensure total_credits is at least completed_credits if plan is missing or student took extra
+        if total_credits < completed_credits:
+            total_credits = completed_credits
+
         return {
             "total_credits": total_credits,
             "completed_credits": completed_credits,
-            "remaining_credits": total_credits - completed_credits,
+            "remaining_credits": max(0, total_credits - completed_credits),
             "completed_courses": len(completed),
             "planned_courses": len(planned),
             "enrolled_courses": len(enrolled),
@@ -602,6 +712,14 @@ class PlanningService:
             "max_credits_fall": self.get_max_credits_for_student(student_id, "Fall"),
             "max_credits_spring": self.get_max_credits_for_student(student_id, "Spring"),
             "max_credits_summer": self.get_max_credits_for_student(student_id, "Summer"),
+            "enrollments": [
+                {
+                    "course_id": sc.course_id,
+                    "status": sc.status,
+                    "grade": sc.grade,
+                    "semester": sc.semester
+                } for sc in student_courses
+            ]
         }
     
     # ==============================

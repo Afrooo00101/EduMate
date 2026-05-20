@@ -1,5 +1,7 @@
 ﻿from sqlalchemy.orm import Session
 
+from sqlalchemy import text
+
 from app.models import AIChatMessage, Recommendation
 from app.schemas.assistant import ChatRequest
 from app.schemas.resume import RecommendationCreate
@@ -8,6 +10,9 @@ from app.schemas.resume import RecommendationCreate
 class AIService:
     def __init__(self, db: Session):
         self.db = db
+
+    def _next_id(self, table_name: str) -> int:
+        return int(self.db.execute(text(f'SELECT COALESCE(MAX(id), 0) + 1 FROM {table_name}')).scalar() or 1)
 
     def create_recommendation(self, student_id: int, payload: RecommendationCreate) -> Recommendation:
         recommendation = Recommendation(student_id=student_id, **payload.model_dump())
@@ -33,7 +38,13 @@ class AIService:
 
     def create_chat_message(self, student_id: int, payload: ChatRequest):
         response = self.generate_chat_response(payload.message)
-        item = AIChatMessage(student_id=student_id, channel=payload.channel, user_message=payload.message, assistant_message=response)
+        item = AIChatMessage(
+            id=self._next_id('ai_chat_messages'),
+            student_id=student_id,
+            channel=payload.channel,
+            user_message=payload.message,
+            assistant_message=response,
+        )
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)

@@ -162,24 +162,24 @@ class AuthService:
         self.db.refresh(student)
         return student
 
-    def authenticate(self, email: str, password: str) -> Student | None:
+    def authenticate(self, email: str, password: str) -> User | None:
         normalized_email = email.strip().lower()
-        print(f"Auth attempt for: {normalized_email}")
-        user = self.db.query(User).options(joinedload(User.student)).filter(User.email == normalized_email).first()
-        if not user:
-            print(f"User not found: {normalized_email}")
+        if '@' not in normalized_email:
+            normalized_email = f'{normalized_email}{SUT_EMAIL_DOMAIN}'
+        user = self.db.query(User).options(
+            joinedload(User.student)
+        ).filter(User.email == normalized_email).first()
+        
+        if not user or not verify_password(password, user.password_hash):
             return None
-        if not verify_password(password, user.password_hash):
-            print(f"Password mismatch for: {normalized_email}")
+        if not user.is_active:
             return None
-        if not user.is_active or not user.student:
-            print(f"User inactive or no student profile: {normalized_email}")
-            return None
+        
         user.last_login = datetime.now(UTC).replace(tzinfo=None)
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
-        return user.student
+        return user
 
     def log_security_event(self, ip_address: str, event_type: str, identifier: str | None, details: str) -> None:
         self.db.add(SecurityAudit(ip_address=ip_address, event_type=event_type, identifier=identifier, details=details))

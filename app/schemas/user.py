@@ -35,6 +35,7 @@ class StudentBase(BaseModel):
 class StudentRead(StudentBase):
     id: int
     user_id: int
+    advisor_id: Optional[int] = None
     is_active: bool
     is_admin: bool
     last_login: Optional[datetime] = None
@@ -64,4 +65,41 @@ class SkillCreate(SkillBase):
 
 class SkillRead(SkillBase):
     id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AdvisorBase(BaseModel):
+    employee_code: str = Field(min_length=3, max_length=50)
+    full_name: str = Field(min_length=2, max_length=150)
+    email: EmailStr
+    department: Optional[str] = Field(default=None, max_length=150)
+
+
+class AdvisorCreate(AdvisorBase):
+    password: str = Field(min_length=6)
+
+
+class AdvisorRead(AdvisorBase):
+    id: int
+    user_id: int
+    is_active: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AdvisorUpdate(BaseModel):
+    employee_code: Optional[str] = Field(default=None, min_length=3, max_length=50)
+    full_name: Optional[str] = Field(default=None, min_length=2, max_length=150)
+    email: Optional[EmailStr] = None
+    department: Optional[str] = Field(default=None, max_length=150)
+    is_active: Optional[bool] = None
+
+
+class UserRead(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    role: str
+    is_active: bool
+    last_login: Optional[datetime] = None
+    student: Optional[StudentRead] = None
     model_config = ConfigDict(from_attributes=True)

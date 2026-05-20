@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.security import require_admin
 from app.database import get_db
 from app.models import SecurityAudit, Student, User
-from app.models.planning import Request
 from app.schemas import (
     AdminCreateRequest,
     BlockedIPRuleCreate,
@@ -33,7 +33,41 @@ router = APIRouter(prefix='/admin', tags=['admin'])
 
 @router.get('/users', response_model=list[StudentRead])
 def list_users(db: Session = Depends(get_db), _: Student = Depends(require_admin)):
-    return db.query(Student).join(User, Student.user_id == User.id).order_by(User.name.asc()).all()
+    students = db.query(Student).join(User, Student.user_id == User.id).order_by(User.name.asc()).all()
+    advisor_rows = db.execute(
+        text(
+            """
+            SELECT student_id, advisor_id
+            FROM student_advisors
+            ORDER BY assigned_at DESC, id DESC
+            """
+        )
+    ).fetchall()
+    advisor_by_student = {}
+    for row in advisor_rows:
+        values = row._mapping
+        advisor_by_student.setdefault(int(values['student_id']), int(values['advisor_id']))
+
+    return [
+        {
+            'id': student.id,
+            'user_id': student.user_id,
+            'student_code': student.student_code,
+            'full_name': student.full_name,
+            'email': student.email,
+            'gpa': student.gpa,
+            'major_id': student.major_id,
+            'graduation_year': student.graduation_year,
+            'skills_summary': student.skills_summary,
+            'profile_image_url': student.profile_image_url,
+            'advisor_id': advisor_by_student.get(student.id),
+            'is_active': student.is_active,
+            'is_admin': student.is_admin,
+            'last_login': student.last_login,
+            'major': student.major,
+        }
+        for student in students
+    ]
 
 
 @router.post('/users/{student_id}/toggle-active', response_model=StudentRead)
@@ -180,126 +214,3 @@ def admin_dashboard(db: Session = Depends(get_db), _: Student = Depends(require_
         'security_logs': db.query(SecurityAudit).count(),
         'events': len(AnalyticsService(db).list_events()),
     }
-
-
-@router.get('/requests')
-def list_requests(db: Session = Depends(get_db), _: Student = Depends(require_admin)):
-    reqs = db.query(Request).order_by(Request.created_at.desc()).all()
-    return [
-        {
-            "id": r.id,
-            "student": r.student,
-            "course": r.course,
-            "status": r.status,
-            "date": r.created_at.isoformat() if r.created_at else None
-        }
-        for r in reqs
-    ]
-
-
-@router.post('/requests/{request_id}/status')
-def update_request_status(request_id: int, status: str, db: Session = Depends(get_db), current_admin: Student = Depends(require_admin)):
-    req = db.query(Request).filter(Request.id == request_id).first()
-    if not req:
-        raise HTTPException(status_code=404, detail='Request not found')
-    req.status = status
-    
-    db.add(SecurityAudit(
-        ip_address='127.0.0.1',
-        event_type='request_status_updated',
-        identifier=current_admin.email,
-        details=f'Updated request #{request_id} to {status}',
-    ))
-    db.commit()
-    db.refresh(req)
-    return {"message": "Status updated successfully", "status": req.status}
-
-
-@router.get('/ai-chats')
-def list_ai_chats(db: Session = Depends(get_db), _: Student = Depends(require_admin)):
-    from app.models.analytics import AIChatMessage
-    chats = db.query(AIChatMessage).order_by(AIChatMessage.created_at.desc()).limit(100).all()
-    return [
-        {
-            "id": c.id,
-            "student_id": c.student_id,
-            "user_message": c.user_message,
-            "assistant_message": c.assistant_message,
-            "date": c.created_at.isoformat() if c.created_at else None
-        }
-        for c in chats
-    ]
-
-
-@router.get('/advisor-messages')
-def list_advisor_chat_summaries(db: Session = Depends(get_db), _: Student = Depends(require_admin)):
-    """List all students who have sent advisor messages with their last message"""
-    from app.models.planning import AdvisorMessage
-    from sqlalchemy import func
-    
-    # Subquery to get max created_at for each student
-    subq = db.query(
-        AdvisorMessage.student_id,
-        func.max(AdvisorMessage.created_at).label('max_date')
-    ).group_by(AdvisorMessage.student_id).subquery()
-    
-    # Query to get the last message for each student
-    msgs = db.query(AdvisorMessage).join(
-        subq, 
-        (AdvisorMessage.student_id == subq.c.student_id) & (AdvisorMessage.created_at == subq.c.max_date)
-    ).all()
-    
-    result = []
-    for m in msgs:
-        student = db.query(Student).filter(Student.id == m.student_id).first()
-        result.append({
-            "student_id": m.student_id,
-            "student_name": student.full_name if student else "Unknown",
-            "last_message": m.content,
-            "date": m.created_at.isoformat() if m.created_at else None,
-            "is_read": m.is_read
-        })
-    return result
-
-
-@router.get('/advisor-messages/{student_id}')
-def get_advisor_messages_for_student(student_id: int, db: Session = Depends(get_db), _: Student = Depends(require_admin)):
-    """Get all messages for a specific student"""
-    from app.models.planning import AdvisorMessage
-    msgs = db.query(AdvisorMessage).filter(AdvisorMessage.student_id == student_id).order_by(AdvisorMessage.created_at.asc()).all()
-    
-    # Mark as read
-    for m in msgs:
-        if m.sender_role == 'student':
-            m.is_read = True
-    db.commit()
-    
-    return [
-        {
-            "id": m.id,
-            "sender_role": m.sender_role,
-            "content": m.content,
-            "date": m.created_at.isoformat() if m.created_at else None
-        }
-        for m in msgs
-    ]
-
-
-@router.post('/advisor-messages/{student_id}')
-def send_advisor_message_to_student(student_id: int, payload: dict, db: Session = Depends(get_db), current_admin: Student = Depends(require_admin)):
-    """Send a message to a student from the advisor/admin"""
-    from app.models.planning import AdvisorMessage
-    content = payload.get('content')
-    if not content:
-        raise HTTPException(status_code=400, detail='Message content is required')
-        
-    msg = AdvisorMessage(
-        student_id=student_id,
-        sender_role='admin',
-        content=content,
-        is_read=True
-    )
-    db.add(msg)
-    db.commit()
-    db.refresh(msg)
-    return {"message": "Message sent", "id": msg.id}

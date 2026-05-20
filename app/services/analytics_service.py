@@ -1,5 +1,7 @@
 ﻿import random
 
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.models import ActivityLog, AnalyticsEvent, ResumeProfile, SavedCourse, SavedInternship, Student, StudentCourse
@@ -10,8 +12,31 @@ class AnalyticsService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _safe_count(self, model, *criteria) -> int:
+        try:
+            query = self.db.query(model)
+            if criteria:
+                query = query.filter(*criteria)
+            return query.count()
+        except (OperationalError, ProgrammingError):
+            self.db.rollback()
+            return 0
+
+    def _safe_first(self, model, *criteria):
+        try:
+            query = self.db.query(model)
+            if criteria:
+                query = query.filter(*criteria)
+            return query.first()
+        except (OperationalError, ProgrammingError):
+            self.db.rollback()
+            return None
+
+    def _next_id(self, table_name: str) -> int:
+        return int(self.db.execute(text(f'SELECT COALESCE(MAX(id), 0) + 1 FROM {table_name}')).scalar() or 1)
+
     def create_event(self, student_id: int | None, payload: AnalyticsEventCreate):
-        event = AnalyticsEvent(student_id=student_id, **payload.model_dump())
+        event = AnalyticsEvent(id=self._next_id('analytics_events'), student_id=student_id, **payload.model_dump())
         self.db.add(event)
         self.db.commit()
         self.db.refresh(event)
@@ -24,7 +49,7 @@ class AnalyticsService:
         return query.order_by(AnalyticsEvent.created_at.desc()).all()
 
     def log_activity(self, student_id: int, payload: ActivityLogCreate):
-        item = ActivityLog(student_id=student_id, **payload.model_dump())
+        item = ActivityLog(id=self._next_id('activity_logs'), student_id=student_id, **payload.model_dump())
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
@@ -34,10 +59,10 @@ class AnalyticsService:
         return self.db.query(ActivityLog).filter(ActivityLog.student_id == student_id).order_by(ActivityLog.created_at.desc()).limit(limit).all()
 
     def build_dashboard(self, student: Student) -> DashboardResponse:
-        saved_courses = self.db.query(SavedCourse).filter(SavedCourse.student_id == student.id).count()
-        saved_internships = self.db.query(SavedInternship).filter(SavedInternship.student_id == student.id).count()
-        planned_courses = self.db.query(StudentCourse).filter(StudentCourse.student_id == student.id).count()
-        resume_profile = self.db.query(ResumeProfile).filter(ResumeProfile.student_id == student.id).first()
+        saved_courses = self._safe_count(SavedCourse, SavedCourse.student_id == student.id)
+        saved_internships = self._safe_count(SavedInternship, SavedInternship.student_id == student.id)
+        planned_courses = self._safe_count(StudentCourse, StudentCourse.student_id == student.id)
+        resume_profile = self._safe_first(ResumeProfile, ResumeProfile.student_id == student.id)
 
         profile_completion = 20
         if student.full_name: profile_completion += 15

@@ -1,11 +1,13 @@
+from typing import Optional
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.schemas.user import StudentRead
+from app.schemas.user import UserRead, StudentRead
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=3, max_length=128)
     captcha_token: str = Field(default='')
 
 
@@ -27,11 +29,14 @@ class RegisterRequest(BaseModel):
         return normalized
 
 
+
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = 'bearer'
     expires_in_minutes: int
-    student: StudentRead
+    user: UserRead
 
 
 class SocialLoginRequest(BaseModel):

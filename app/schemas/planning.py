@@ -1,7 +1,35 @@
+from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
+from typing import Optional, List
 
 from app.schemas.course import StudentCourseRead, StudentCourseUpsert
-from app.schemas.schemas import CareerPathTimeline, SemesterSummary, GPACalculation
+
+
+class SemesterSummary(BaseModel):
+    level: int
+    semester: str
+    semester_name: str
+    courses: list[dict] = []
+    total_credits: int = 0
+    completed_credits: int = 0
+    progress: float = 0.0
+
+
+class CareerPathTimeline(BaseModel):
+    career_path: str = ""
+    semesters: list[SemesterSummary | dict] = []
+    total_progress: float = 0.0
+    current_gpa: float = 0.0
+    estimated_graduation: str = ""
+
+
+class GPACalculation(BaseModel):
+    semester_gpa: float = 0.0
+    cumulative_gpa: float = 0.0
+    total_credits: int = 0
+    completed_credits: int = 0
+    grade_points: float = 0.0
+    distribution: dict[str, int] = {}
 
 
 class PlanningOverview(BaseModel):
@@ -34,12 +62,21 @@ class GPASummary(BaseModel):
     distribution: dict[str, int]
 
 
+class SummerRequestCreate(BaseModel):
+    course_id: int
+    semester: Optional[str] = "Summer"
+    reason: str | None = None
+
 class SummerRequestRead(BaseModel):
     id: int
-    course: str
-    status: str
+    student_id: int
+    course_id: int
+    semester: Optional[str]
     reason: str | None
-    created_at: str | None = None
+    status: str
+    admin_notes: str | None = None
+    requested_at: Optional[object] = None
+    course: Optional[dict] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -51,8 +88,10 @@ class AdvisorMessageCreate(AdvisorMessageBase):
     pass
 
 
+from datetime import datetime
+
 class AdvisorMessageRead(AdvisorMessageBase):
     id: int
     sender_role: str
-    created_at: str | None = None
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

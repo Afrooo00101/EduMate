@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 
 import app.models  # noqa: F401
 from app.core.security import get_password_hash
+from sqlalchemy import text as sa_text
 from app.database import Base, SessionLocal, engine
 from app.models import (
     AIChatMessage,
@@ -243,7 +244,11 @@ def build_semesters_json(plan_rows):
 
 
 def seed() -> None:
-    Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        conn.execute(sa_text("SET FOREIGN_KEY_CHECKS=0"))
+        Base.metadata.create_all(bind=engine)
+        conn.execute(sa_text("SET FOREIGN_KEY_CHECKS=1"))
+        conn.commit()
     session = SessionLocal()
     try:
         major_map = {}
@@ -315,9 +320,9 @@ def seed() -> None:
             students.append(student)
 
         session.flush()
-        active_user_ids = [student.user_id for student in students if student.user_id]
-        session.query(User).filter(~User.id.in_(active_user_ids)).delete(synchronize_session=False)
-        session.flush()
+        # active_user_ids = [student.user_id for student in students if student.user_id]
+        # session.query(User).filter(~User.id.in_(active_user_ids)).delete(synchronize_session=False)
+        # session.flush()
         student_map = {student.student_code: student for student in students}
         seeded_student_ids = [student.id for student in students]
 

@@ -1,4 +1,4 @@
-﻿from sqlalchemy import or_
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Course, Internship, InternshipApplication, SavedCourse, SavedInternship, StudentCourse
@@ -11,13 +11,13 @@ class SearchService:
         self.db = db
 
     def list_courses(self, major_id: int | None = None):
-        query = self.db.query(Course)
+        query = self.db.query(Course).options(joinedload(Course.prerequisites))
         if major_id is not None:
             query = query.filter(Course.major_id == major_id)
         return query.order_by(Course.code.asc()).all()
 
     def search_courses(self, query_text: str | None = None, category: str | None = None):
-        query = self.db.query(Course)
+        query = self.db.query(Course).options(joinedload(Course.prerequisites))
         if query_text:
             like = f'%{query_text}%'
             query = query.filter(or_(Course.name.ilike(like), Course.code.ilike(like), Course.description.ilike(like)))
@@ -56,7 +56,19 @@ class SearchService:
         if active_only:
             query = query.filter(Internship.is_active.is_(True))
         if position:
-            query = query.filter(Internship.position.ilike(f'%{position}%'))
+            position_key = position.strip().lower()
+            position_terms = {
+                'software': ['software', 'frontend', 'front-end', 'backend', 'back-end', 'full stack', 'developer', 'engineer'],
+                'marketing': ['marketing', 'digital marketing', 'social media', 'content'],
+                'finance': ['finance', 'financial', 'accounting', 'banking'],
+                'hr': ['hr', 'human resources', 'recruitment', 'talent'],
+                'sales': ['sales', 'business development', 'account'],
+                'design': ['design', 'designer', 'ui', 'ux', 'graphic'],
+                'data': ['data', 'analytics', 'analyst', 'business intelligence', 'machine learning'],
+                'project': ['project', 'coordinator', 'scrum', 'product'],
+            }
+            terms = position_terms.get(position_key, [position_key])
+            query = query.filter(or_(*[Internship.position.ilike(f'%{term}%') for term in terms]))
         return query.order_by(Internship.company_name.asc()).all()
 
     def list_student_applications(self, student_id: int):

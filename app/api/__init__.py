@@ -1,9 +1,12 @@
-﻿from app.api.admin import router as admin_router
+from app.api.admin import router as admin_router
+from app.api.advising import router as advising_router
 from app.api.analytics import router as analytics_router
 from app.api.assistant import router as assistant_router
 from app.api.auth import router as auth_router
+from app.api.chat import router as chat_router
 from app.api.courses import router as courses_router
 from app.api.internships import router as internships_router
 from app.api.planning import router as planning_router
 from app.api.resume import router as resume_router
 from app.api.users import router as users_router
+from app.api.advisors import router as advisors_router

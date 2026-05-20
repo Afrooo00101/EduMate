@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CourseBase(BaseModel):
@@ -7,14 +7,24 @@ class CourseBase(BaseModel):
     credits: int = Field(ge=1, le=12)
     major_id: int | None = None
     description: str | None = None
+    level: int | None = Field(default=None, ge=1, le=10)
+    semester: str | None = None
 
 
 class CourseCreate(CourseBase):
-    pass
+    prerequisite_ids: list[int] = []
 
 
 class CourseRead(CourseBase):
     id: int
+    prerequisites: list['CourseReadSimplified'] = []
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CourseReadSimplified(BaseModel):
+    id: int
+    code: str
+    name: str
     model_config = ConfigDict(from_attributes=True)
 
 

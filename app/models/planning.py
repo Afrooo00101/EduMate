@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, UniqueConstraint, Numeric
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, UniqueConstraint, Numeric, DateTime, func, Enum
 from sqlalchemy.dialects.mysql import INTEGER, DECIMAL
 from sqlalchemy.orm import relationship
 
@@ -10,7 +10,7 @@ class PlannerState(TimestampMixin, Base):
     __tablename__ = 'planner_states'
 
     id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'), nullable=False, unique=True)
+    student_id = Column(INTEGER(unsigned=True), ForeignKey('students.id', ondelete='CASCADE'), nullable=False, unique=True)
     career_path = Column(String(150), nullable=False, default='Cyber Security')
     mode = Column(String(50), nullable=False, default='preview')
     semesters_json = Column(Text, nullable=True)
@@ -39,7 +39,7 @@ class StudyPlan(TimestampMixin, Base):
     __table_args__ = (UniqueConstraint('major_id', 'course_id', name='uq_study_plan_major_course'),)
 
     id = Column(Integer, primary_key=True, index=True)
-    major_id = Column(Integer, ForeignKey('majors.id', ondelete='CASCADE'), nullable=False, index=True)
+    major_id = Column(INTEGER(unsigned=True), ForeignKey('majors.id', ondelete='CASCADE'), nullable=False, index=True)
     course_id = Column(Integer, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False, index=True)
     semester = Column(String(20), nullable=False, index=True)
     recommended_level_no = Column(Integer, nullable=True)
@@ -50,21 +50,27 @@ class StudyPlan(TimestampMixin, Base):
     course = relationship('Course')
 
 
-class Request(TimestampMixin, Base):
-    __tablename__ = 'requests'
+class SummerRequest(TimestampMixin, Base):
+    __tablename__ = 'summer_requests'
 
-    id = Column(Integer, primary_key=True, index=True)
-    student = Column(String(100), nullable=False)
-    course = Column(String(150), nullable=False)
-    status = Column(String(50), nullable=False, default="Pending")
+    id = Column(INTEGER(unsigned=True), primary_key=True, autoincrement=True)
+    student_id = Column(INTEGER(unsigned=True), ForeignKey('students.id', ondelete='CASCADE'), nullable=False)
+    course_id = Column(Integer, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False)
+    semester = Column(String(50), nullable=True, default='Summer')
     reason = Column(Text, nullable=True)
+    status = Column(Enum('pending', 'approved', 'rejected'), nullable=False, default='pending')
+    admin_notes = Column(Text, nullable=True)
+    requested_at = Column(DateTime, server_default=func.now())
+
+    student = relationship('Student', back_populates='summer_requests')
+    course = relationship('Course')
 
 
 class AdvisorMessage(TimestampMixin, Base):
     __tablename__ = 'advisor_messages'
 
     id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'), nullable=False, index=True)
+    student_id = Column(INTEGER(unsigned=True), ForeignKey('students.id', ondelete='CASCADE'), nullable=False, index=True)
     sender_role = Column(String(20), nullable=False)  # 'student' or 'admin'
     content = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False)
