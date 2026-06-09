@@ -7,6 +7,8 @@ let cachedSecurityLogs = [];
 let cachedAnalyticsEvents = [];
 let cachedIpRules = [];
 let cachedCountryAccess = { mode: 'allow_all', blocked_countries: [] };
+let cachedAdvisors = [];
+let assigningStudentId = null;
 const ADMIN_EVENTS_PATH = '/admin/platform-events';
 
 function notify(message, type = 'info') {
@@ -419,6 +421,7 @@ function renderUsersTable(users) {
             <td><span class="user-status ${userStatusClass(user)}">${userStatus(user)}</span></td>
             <td>
                 <button class="link-btn" style="padding:4px 8px;margin-right:5px" onclick="viewUserDetails(${user.id})">View</button>
+                <button class="link-btn" style="padding:4px 8px;margin-right:5px" onclick="openAssignAdvisor(${user.id})">Assign</button>
                 <button class="link-btn" style="padding:4px 8px" onclick="toggleUserBlock(${user.id})">${user.is_active ? 'Block' : 'Unblock'}</button>
             </td>
         </tr>
@@ -852,89 +855,6 @@ function logSecurityEvent() {}
 function resetLoginAttempts() {}
 function registerFailedLogin() {}
 
-async function loadRequestsData() {
-    try {
-        const requests = await adminApi('/admin/requests');
-        const tbody = document.getElementById('requests-table-body');
-        if (!tbody) return;
-        
-        if (!requests || requests.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">No requests found</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = requests.map(req => {
-            const date = new Date(req.date);
-            const formattedDate = isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
-            
-            let statusColor = 'var(--muted)';
-            if (req.status === 'Approved') statusColor = '#10B981';
-            if (req.status === 'Rejected') statusColor = '#EF4444';
-            if (req.status === 'Pending') statusColor = '#F59E0B';
-            
-            return `
-                <tr>
-                    <td>${escapeHtml(req.student)}</td>
-                    <td>${escapeHtml(req.course)}</td>
-                    <td>${formattedDate}</td>
-                    <td style="font-weight:600;color:${statusColor}">${escapeHtml(req.status)}</td>
-                    <td>
-                        <select class="input" style="padding:4px;font-size:0.85rem;" onchange="updateRequestStatus(${req.id}, this.value)">
-                            <option value="">Update...</option>
-                            <option value="Approved">Approve</option>
-                            <option value="Rejected">Reject</option>
-                            <option value="Pending">Pending</option>
-                        </select>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    } catch (error) {
-        notify(error.message || 'Failed to load requests', 'error');
-    }
-}
-
-async function updateRequestStatus(reqId, newStatus) {
-    if (!newStatus) return;
-    try {
-        await adminApi(`/admin/requests/${reqId}/status?status=${encodeURIComponent(newStatus)}`, { method: 'POST' });
-        notify('Request status updated', 'success');
-        loadRequestsData();
-    } catch (error) {
-        notify(error.message || 'Failed to update request status', 'error');
-    }
-}
-
-
-async function loadAiChatsData() {
-    try {
-        const chats = await adminApi('/admin/ai-chats');
-        const tbody = document.getElementById('ai-chats-table-body');
-        if (!tbody) return;
-        
-        if (!chats || chats.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--muted)">No AI chats found</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = chats.map(chat => {
-            const date = new Date(chat.date);
-            const formattedDate = isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
-            
-            return `
-                <tr>
-                    <td>${escapeHtml(chat.student_id)}</td>
-                    <td>${escapeHtml(chat.user_message)}</td>
-                    <td>${escapeHtml(chat.assistant_message)}</td>
-                    <td>${formattedDate}</td>
-                </tr>
-            `;
-        }).join('');
-    } catch (error) {
-        notify(error.message || 'Failed to load AI chats', 'error');
-    }
-}
-
 function runPageInit(id) {
     if (id === 'dashboard') loadAllDashboardData();
     if (id === 'users') loadUsersData();
@@ -942,19 +862,27 @@ function runPageInit(id) {
     if (id === 'security') loadSecurityData();
     if (id === 'logs') loadSystemLogs();
     if (id === 'settings') loadAdminSettings();
-    if (id === 'requests') loadRequestsData();
-    if (id === 'ai_chats') loadAiChatsData();
+    if (id === 'courses' && typeof loadCourses === 'function') loadCourses();
+    if (id === 'requests' && typeof loadRequests === 'function') loadRequests();
+    if (id === 'advisors') loadAdvisorsData();
+    if (id === 'meeting-slots') loadMeetingSlotsAdmin();
+    if (id === 'advisor-students') loadAdvisorStudentsData();
 }
 
 function navigateTo(id) {
     const logged = sessionStorage.getItem('edumate_admin_logged') === '1';
-    const protectedPages = new Set(['dashboard', 'users', 'analytics', 'security', 'logs', 'settings', 'requests', 'ai_chats']);
+    const protectedPages = new Set(['dashboard', 'users', 'analytics', 'security', 'logs', 'settings', 'courses', 'requests', 'advisors', 'meeting-slots', 'advisor-students']);
     if (protectedPages.has(id) && !logged) {
         id = 'login';
     }
 
     const next = document.getElementById(id);
     if (!next) return;
+
+    const header = document.querySelector('.header');
+    if (header) {
+        header.style.display = (id === 'login') ? 'none' : 'flex';
+    }
 
     document.querySelectorAll('.page').forEach((page) => page.classList.remove('active'));
     next.classList.add('active');
@@ -967,8 +895,31 @@ function navigateTo(id) {
 function initializeApp() {
     updateThemeIcon();
     updateAdminProfile();
+    const userType = sessionStorage.getItem('edumate_user_type');
+    
+    // Hide/Show links based on role
+    const adminOnlyLinks = ['users', 'analytics', 'security', 'logs', 'settings', 'advisors'];
+    const advisorOnlyLinks = ['advisor-students'];
+    
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        const onclick = link.getAttribute('onclick');
+        if (!onclick) return;
+        const pageMatch = onclick.match(/'(.*?)'/);
+        if (!pageMatch) return;
+        const page = pageMatch[1];
+        
+        if (userType === 'advisor') {
+            if (adminOnlyLinks.includes(page)) link.style.display = 'none';
+            if (advisorOnlyLinks.includes(page)) link.style.display = 'block';
+        } else if (userType === 'admin') {
+            if (advisorOnlyLinks.includes(page)) link.style.display = 'none';
+            if (adminOnlyLinks.includes(page)) link.style.display = 'block';
+        }
+    });
+
     if (sessionStorage.getItem('edumate_admin_logged') === '1') {
-        navigateTo('dashboard');
+        const startPage = (userType === 'advisor') ? 'advisor-students' : 'dashboard';
+        navigateTo(startPage);
     } else {
         navigateTo('login');
     }
@@ -982,6 +933,11 @@ function setupEventListeners() {
         if (event.key === 'Enter') searchUsers();
     });
     document.getElementById('analytics-period')?.addEventListener('change', loadAnalytics);
+    
+    // Add Advisor Button
+    document.getElementById('addAdvisorBtn')?.addEventListener('click', () => {
+        if (typeof showAddAdvisor === 'function') showAddAdvisor();
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1021,7 +977,498 @@ window.deleteAdminUser = deleteAdminUser;
 window.logSecurityEvent = logSecurityEvent;
 window.resetLoginAttempts = resetLoginAttempts;
 window.registerFailedLogin = registerFailedLogin;
-window.loadRequestsData = loadRequestsData;
-window.updateRequestStatus = updateRequestStatus;
-window.loadAiChatsData = loadAiChatsData;
+window.openAddCourse = typeof openAddCourse === 'function' ? openAddCourse : function(){};
+window.openEditCourse = typeof openEditCourse === 'function' ? openEditCourse : function(){};
+window.saveCourse = typeof saveCourse === 'function' ? saveCourse : function(){};
+window.deleteCourse = typeof deleteCourse === 'function' ? deleteCourse : function(){};
+window.closeCourseModal = typeof closeCourseModal === 'function' ? closeCourseModal : function(){};
+window.openAddRequest = typeof openAddRequest === 'function' ? openAddRequest : function(){};
+window.submitNewRequest = typeof submitNewRequest === 'function' ? submitNewRequest : function(){};
+window.deleteRequest = typeof deleteRequest === 'function' ? deleteRequest : function(){};
+window.closeRequestAddModal = typeof closeRequestAddModal === 'function' ? closeRequestAddModal : function(){};
+window.closeModalReq = typeof closeModalReq === 'function' ? closeModalReq : function(){};
 
+/* ===== ADVISORS LOGIC ===== */
+async function loadAdvisorsData() {
+    try {
+        cachedAdvisors = await adminApi('/advisors');
+        renderAdvisorsTable();
+    } catch (e) {
+        notify('Failed to load advisors', 'error');
+    }
+}
+
+function renderAdvisorsTable() {
+    const wrap = document.getElementById('advisorsTableWrap');
+    if (!wrap) return;
+    if (!cachedAdvisors.length) {
+        wrap.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">No advisors found.</div>';
+        return;
+    }
+    let html = `<table><thead><tr>
+        <th>Code</th><th>Name</th><th>Email</th><th>Department</th><th>Status</th><th>Actions</th>
+    </tr></thead><tbody>`;
+    cachedAdvisors.forEach(a => {
+        html += `<tr>
+            <td><span class="badge" style="background:var(--primary)">${escapeHtml(a.employee_code)}</span></td>
+            <td style="font-weight:600">${escapeHtml(a.full_name)}</td>
+            <td>${escapeHtml(a.email)}</td>
+            <td>${escapeHtml(a.department || '—')}</td>
+            <td><span class="user-status ${a.is_active ? 'status-active' : 'status-blocked'}">${a.is_active ? 'Active' : 'Inactive'}</span></td>
+            <td>
+                <div class="action-buttons">
+                    <button class="link-btn" onclick="viewAdvisorStudents(${a.id})">Students</button>
+                    <button class="link-btn" onclick="editAdvisor(${a.id})">Edit</button>
+                    <button class="link-btn" style="border-color:${a.is_active ? '#EF4444' : '#10B981'};color:${a.is_active ? '#EF4444' : '#10B981'}" onclick="toggleAdvisorStatus(${a.id})">${a.is_active ? 'Block' : 'Unblock'}</button>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+async function loadMeetingSlotsAdmin() {
+    try {
+        if (!cachedAdvisors.length) cachedAdvisors = await adminApi('/advisors');
+        const advisorSelect = document.getElementById('slotAdvisorSelect');
+        if (advisorSelect) {
+            advisorSelect.innerHTML = '<option value="">Select advisor...</option>' + cachedAdvisors
+                .filter(a => a.is_active)
+                .map(a => `<option value="${a.user_id}">${escapeHtml(a.full_name)} (${escapeHtml(a.employee_code)})</option>`)
+                .join('');
+        }
+
+        const slots = await adminApi('/advising/slots');
+        renderMeetingSlotsAdmin(slots);
+    } catch (e) {
+        const wrap = document.getElementById('adminMeetingSlotsWrap');
+        if (wrap) wrap.innerHTML = '<div style="color:#ef4444;padding:20px;text-align:center">Failed to load meeting slots.</div>';
+    }
+}
+
+function renderMeetingSlotsAdmin(slots) {
+    const wrap = document.getElementById('adminMeetingSlotsWrap');
+    if (!wrap) return;
+    if (!Array.isArray(slots) || !slots.length) {
+        wrap.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">No active meeting slots yet.</div>';
+        return;
+    }
+    wrap.innerHTML = `<table><thead><tr>
+        <th>Advisor</th><th>Day</th><th>Time</th><th>Room</th><th>Status</th>
+    </tr></thead><tbody>${slots.map(slot => `
+        <tr>
+            <td style="font-weight:600">${escapeHtml(slot.advisor_name || 'Advisor')}</td>
+            <td>${escapeHtml(slot.day_of_week)}</td>
+            <td>${escapeHtml(slot.start_time)} - ${escapeHtml(slot.end_time)}</td>
+            <td>${escapeHtml(slot.location || 'TBA')}</td>
+            <td><span class="user-status status-active">Active</span></td>
+        </tr>`).join('')}</tbody></table>`;
+}
+
+async function submitAdvisorSlot() {
+    const advisorUserId = Number(document.getElementById('slotAdvisorSelect')?.value || 0);
+    const day = document.getElementById('slotDay')?.value || '';
+    const startTime = document.getElementById('slotStartTime')?.value || '';
+    const location = document.getElementById('slotLocation')?.value.trim() || '';
+    if (!advisorUserId || !day || !startTime || !location) {
+        notify('Please select advisor, day, time, and room.', 'warning');
+        return;
+    }
+    try {
+        await adminApi('/advising/admin/slots', {
+            method: 'POST',
+            body: JSON.stringify({
+                advisor_user_id: advisorUserId,
+                day_of_week: day,
+                start_time: startTime,
+                location
+            })
+        });
+        notify('Meeting slot saved', 'success');
+        await loadMeetingSlotsAdmin();
+    } catch (e) {
+        notify(e.message || 'Failed to save meeting slot', 'error');
+    }
+}
+
+function showAddAdvisor() {
+    document.getElementById('advisorModalTitle').textContent = 'Add New Advisor';
+    document.getElementById('edit-advisor-id').value = '';
+    document.getElementById('adv-name').value = '';
+    document.getElementById('adv-email').value = '';
+    document.getElementById('adv-code').value = '';
+    document.getElementById('adv-dept').value = '';
+    document.getElementById('adv-pass').value = '';
+    document.getElementById('adv-pass-wrap').style.display = 'block';
+    document.getElementById('advisorModalBtn').textContent = 'Create Advisor';
+    document.getElementById('addAdvisorModal').style.display = 'flex';
+}
+
+function editAdvisor(id) {
+    const a = cachedAdvisors.find(x => x.id === id);
+    if (!a) return;
+    
+    document.getElementById('advisorModalTitle').textContent = 'Edit Advisor';
+    document.getElementById('edit-advisor-id').value = a.id;
+    document.getElementById('adv-name').value = a.full_name;
+    document.getElementById('adv-email').value = a.email;
+    document.getElementById('adv-code').value = a.employee_code;
+    document.getElementById('adv-dept').value = a.department || '';
+    document.getElementById('adv-pass-wrap').style.display = 'none'; // Don't allow password change here for now
+    document.getElementById('advisorModalBtn').textContent = 'Save Changes';
+    document.getElementById('addAdvisorModal').style.display = 'flex';
+}
+
+function closeAddAdvisorModal() {
+    document.getElementById('addAdvisorModal').style.display = 'none';
+}
+
+async function submitAdvisorForm() {
+    const id = document.getElementById('edit-advisor-id').value;
+    const fullName = document.getElementById('adv-name').value.trim();
+    const email = document.getElementById('adv-email').value.trim();
+    const empCode = document.getElementById('adv-code').value.trim();
+    const dept = document.getElementById('adv-dept').value.trim();
+    
+    const payload = {
+        full_name: fullName,
+        email: email,
+        employee_code: empCode,
+        department: dept || null
+    };
+
+    if (!fullName || !email || !empCode) {
+        notify('Please fill in all required fields', 'error');
+        return;
+    }
+
+    try {
+        if (id) {
+            // Update
+            await adminApi(`/advisors/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            });
+            notify('Advisor updated successfully', 'success');
+        } else {
+            // Create
+            const password = document.getElementById('adv-pass').value.trim();
+            if (!password) { notify('Password is required for new advisors', 'error'); return; }
+            payload.password = password;
+            await adminApi('/advisors', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            notify('Advisor created successfully', 'success');
+        }
+        
+        closeAddAdvisorModal();
+        await loadAdvisorsData();
+    } catch (e) {
+        notify(e.message || 'Failed to save advisor', 'error');
+    }
+}
+
+async function toggleAdvisorStatus(id) {
+    const a = cachedAdvisors.find(x => x.id === id);
+    if (!a) return;
+    try {
+        await adminApi(`/advisors/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ is_active: !a.is_active })
+        });
+        notify(`Advisor ${a.is_active ? 'blocked' : 'unblocked'}`, 'success');
+        await loadAdvisorsData();
+    } catch (e) {
+        notify(e.message || 'Failed to update status', 'error');
+    }
+}
+
+async function viewAdvisorStudents(advisorId) {
+    const advisor = cachedAdvisors.find(a => a.id === advisorId);
+    if (!advisor) return;
+    
+    document.getElementById('advisorStudentsModalTitle').textContent = `Students of ${advisor.full_name}`;
+    const body = document.getElementById('advisorStudentsModalBody');
+    body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Loading students...</div>';
+    document.getElementById('advisorStudentsModal').style.display = 'flex';
+    
+    try {
+        const students = await adminApi(`/advisors/${advisorId}/students`);
+        renderAdvisorStudentsInModal(advisorId, students);
+    } catch (e) {
+        body.innerHTML = `<div style="text-align:center;padding:20px;color:#EF4444">${e.message || 'Failed to load students'}</div>`;
+    }
+}
+
+function renderAdvisorStudentsInModal(advisorId, students) {
+    const body = document.getElementById('advisorStudentsModalBody');
+    let html = `
+        <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center">
+            <h4 style="margin:0">Assigned Students (${students.length})</h4>
+            <button class="btn" style="padding:6px 12px; font-size:0.85rem" onclick="showAddStudentToAdvisor(${advisorId})">+ Add Student</button>
+        </div>
+    `;
+    
+    if (!students.length) {
+        html += '<div style="text-align:center;padding:20px;color:var(--muted);border:1px dashed var(--border);border-radius:8px">No students assigned.</div>';
+    } else {
+        html += '<table style="width:100%;font-size:0.85rem"><thead><tr><th>Name</th><th>Code</th><th>Action</th></tr></thead><tbody>';
+        students.forEach(s => {
+            html += `<tr>
+                <td style="font-weight:600">${escapeHtml(s.full_name)}</td>
+                <td>${escapeHtml(s.student_code)}</td>
+                <td>
+                    <button class="link-btn" style="border-color:#EF4444;color:#EF4444;padding:2px 6px" onclick="removeStudentFromAdvisor(${advisorId}, ${s.id})">Remove</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+    }
+    
+    body.innerHTML = html;
+}
+
+async function removeStudentFromAdvisor(advisorId, studentId) {
+    if (!confirm('Are you sure you want to remove this student from this advisor?')) return;
+    try {
+        await adminApi(`/advisors/${advisorId}/assign/${studentId}`, { method: 'DELETE' });
+        notify('Student removed successfully', 'success');
+        // Refresh the list in modal
+        const students = await adminApi(`/advisors/${advisorId}/students`);
+        renderAdvisorStudentsInModal(advisorId, students);
+    } catch (e) {
+        notify(e.message || 'Failed to remove student', 'error');
+    }
+}
+
+async function showAddStudentToAdvisor(advisorId) {
+    const body = document.getElementById('advisorStudentsModalBody');
+    body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Loading unassigned students...</div>';
+    
+    try {
+        const allStudents = await adminApi('/admin/users');
+        const unassigned = allStudents.filter(s => !s.advisor_id);
+        
+        let html = `
+            <div style="margin-bottom:15px; display:flex; align-items:center; gap:10px">
+                <button class="link-btn" style="padding:4px 8px" onclick="viewAdvisorStudents(${advisorId})">← Back</button>
+                <h4 style="margin:0">Add Student to Advisor</h4>
+            </div>
+        `;
+        
+        if (!unassigned.length) {
+            html += '<div style="text-align:center;padding:20px;color:var(--muted)">No unassigned students found.</div>';
+        } else {
+            html += '<div style="max-height:300px; overflow-y:auto"><table style="width:100%;font-size:0.85rem"><thead><tr><th>Name</th><th>Code</th><th>Action</th></tr></thead><tbody>';
+            unassigned.forEach(s => {
+                html += `<tr>
+                    <td style="font-weight:600">${escapeHtml(s.full_name)}</td>
+                    <td>${escapeHtml(s.student_code)}</td>
+                    <td>
+                        <button class="link-btn" style="border-color:#10B981;color:#10B981;padding:2px 6px" onclick="addStudentToAdvisor(${advisorId}, ${s.id})">Add</button>
+                    </td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
+        }
+        body.innerHTML = html;
+    } catch (e) {
+        notify(e.message || 'Failed to load students', 'error');
+    }
+}
+
+async function addStudentToAdvisor(advisorId, studentId) {
+    try {
+        await adminApi(`/advisors/${advisorId}/assign/${studentId}`, { method: 'POST' });
+        notify('Student assigned successfully', 'success');
+        // Go back to the student list
+        viewAdvisorStudents(advisorId);
+    } catch (e) {
+        notify(e.message || 'Failed to assign student', 'error');
+    }
+}
+
+function closeAdvisorStudentsModal() {
+    document.getElementById('advisorStudentsModal').style.display = 'none';
+}
+
+async function openAssignAdvisor(userId) {
+    assigningStudentId = userId;
+    const user = cachedAdminUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    document.getElementById('assignStudentInfo').textContent = `Assigning advisor for: ${user.full_name || user.email}`;
+    
+    try {
+        if (!cachedAdvisors.length) {
+            cachedAdvisors = await adminApi('/advisors');
+        }
+        const select = document.getElementById('advisorSelect');
+        select.innerHTML = '<option value="">Select Advisor</option>';
+        cachedAdvisors.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            opt.textContent = `${a.full_name} (${a.employee_code})`;
+            if (user.advisor_id === a.id) opt.selected = true;
+            select.appendChild(opt);
+        });
+        document.getElementById('assignAdvisorModal').style.display = 'flex';
+    } catch (e) {
+        notify('Failed to load advisors list', 'error');
+    }
+}
+
+function closeAssignAdvisorModal() {
+    document.getElementById('assignAdvisorModal').style.display = 'none';
+}
+
+async function submitAssignment() {
+    const advisorId = document.getElementById('advisorSelect').value;
+    if (!advisorId) { notify('Please select an advisor', 'warning'); return; }
+    
+    try {
+        await adminApi(`/advisors/${advisorId}/assign/${assigningStudentId}`, { method: 'POST' });
+        notify('Advisor assigned successfully', 'success');
+        closeAssignAdvisorModal();
+        await loadUsersData();
+    } catch (e) {
+        notify(e.message || 'Failed to assign advisor', 'error');
+    }
+}
+
+async function loadAdvisorStudentsData() {
+    try {
+        const students = await adminApi('/advisors/my-students');
+        renderAdvisorStudentsTable(students);
+    } catch (e) {
+        notify('Failed to load your students', 'error');
+    }
+}
+
+function renderAdvisorStudentsTable(students) {
+    const wrap = document.getElementById('advisorStudentsWrap');
+    if (!wrap) return;
+    if (!students.length) {
+        wrap.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">No students assigned to you yet.</div>';
+        return;
+    }
+    let html = `<table><thead><tr>
+        <th>Code</th><th>Name</th><th>Email</th><th>GPA</th><th>Action</th>
+    </tr></thead><tbody>`;
+    students.forEach(s => {
+        html += `<tr>
+            <td><span class="badge" style="background:var(--primary)">${escapeHtml(s.student_code)}</span></td>
+            <td style="font-weight:600">${escapeHtml(s.full_name)}</td>
+            <td>${escapeHtml(s.email)}</td>
+            <td>${s.gpa || '—'}</td>
+            <td><button class="link-btn" onclick="viewStudentCourses(${s.id})">Courses</button></td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+async function viewStudentCourses(studentId) {
+    try {
+        const enrollments = await adminApi(`/advisors/students/${studentId}/courses`);
+        const user = cachedAdminUsers.find(u => u.id === studentId) || { full_name: 'Student' };
+        
+        const modal = document.getElementById('academicRecordModal');
+        const title = document.getElementById('academicRecordTitle');
+        const body = document.getElementById('academicRecordBody');
+        
+        title.innerText = `${user.full_name || user.name || 'Student'}'s Academic Record`;
+        
+        if (!enrollments.length) {
+            body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">No academic records found.</div>';
+        } else {
+            // Split courses: Finished (has grade or completed status) vs Ongoing/Planned
+            const finished = enrollments.filter(e => e.grade || ['completed', 'finished', 'passed', 'failed'].includes(String(e.status).toLowerCase()));
+            const current = enrollments.filter(e => !finished.includes(e));
+            
+            let html = '<div style="display:grid;gap:25px">';
+            
+            // Current & Planned section
+            html += `<div><h3 style="color:var(--primary);margin-bottom:12px;font-size:1.1rem;border-bottom:1px solid var(--border);padding-bottom:5px">Current & Planned Courses</h3>`;
+            if (current.length) {
+                html += `<table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+                    <thead><tr style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">
+                        <th style="text-align:left;padding:8px">Code</th>
+                        <th style="text-align:left;padding:8px">Course</th>
+                        <th style="text-align:left;padding:8px">Semester</th>
+                        <th style="text-align:left;padding:8px">Status</th>
+                    </tr></thead><tbody>`;
+                current.forEach(e => {
+                    const statusColor = String(e.status).toLowerCase() === 'enrolled' ? '#8B5CF6' : '#6B7280';
+                    html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                        <td style="padding:10px 8px;font-weight:600">${escapeHtml(e.course.code)}</td>
+                        <td style="padding:10px 8px">${escapeHtml(e.course.name)}</td>
+                        <td style="padding:10px 8px">${escapeHtml(e.semester)}</td>
+                        <td style="padding:10px 8px"><span class="badge" style="background:${statusColor}">${escapeHtml(e.status)}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p style="color:var(--muted);font-size:0.9rem">No current or planned courses.</p>';
+            }
+            html += '</div>';
+            
+            // Completed section
+            html += `<div><h3 style="color:#10B981;margin-bottom:12px;font-size:1.1rem;border-bottom:1px solid var(--border);padding-bottom:5px">Completed Courses (Transcript)</h3>`;
+            if (finished.length) {
+                html += `<table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+                    <thead><tr style="color:var(--muted);font-size:0.75rem;text-transform:uppercase">
+                        <th style="text-align:left;padding:8px">Code</th>
+                        <th style="text-align:left;padding:8px">Course</th>
+                        <th style="text-align:left;padding:8px">Grade</th>
+                        <th style="text-align:left;padding:8px">Semester</th>
+                    </tr></thead><tbody>`;
+                finished.forEach(e => {
+                    const grade = String(e.grade || '—').toUpperCase();
+                    const gradeColor = grade === 'F' ? '#EF4444' : (['A', 'A+', 'A-'].includes(grade) ? '#10B981' : '#F59E0B');
+                    html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                        <td style="padding:10px 8px;font-weight:600">${escapeHtml(e.course.code)}</td>
+                        <td style="padding:10px 8px">${escapeHtml(e.course.name)}</td>
+                        <td style="padding:10px 8px"><strong style="color:${gradeColor};font-size:1.1rem">${escapeHtml(grade)}</strong></td>
+                        <td style="padding:10px 8px">${escapeHtml(e.semester)}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p style="color:var(--muted);font-size:0.9rem">No completed courses yet.</p>';
+            }
+            html += '</div></div>';
+            body.innerHTML = html;
+        }
+        
+        modal.style.display = 'flex';
+    } catch (e) {
+        console.error(e);
+        notify('Failed to load student academic record', 'error');
+    }
+}
+
+function closeAcademicRecordModal() {
+    document.getElementById('academicRecordModal').style.display = 'none';
+}
+
+window.closeAcademicRecordModal = closeAcademicRecordModal;
+
+window.submitAdvisorForm = submitAdvisorForm;
+window.editAdvisor = editAdvisor;
+window.toggleAdvisorStatus = toggleAdvisorStatus;
+window.viewAdvisorStudents = viewAdvisorStudents;
+window.closeAdvisorStudentsModal = closeAdvisorStudentsModal;
+window.removeStudentFromAdvisor = removeStudentFromAdvisor;
+window.showAddStudentToAdvisor = showAddStudentToAdvisor;
+window.addStudentToAdvisor = addStudentToAdvisor;
+window.showAddAdvisor = showAddAdvisor;
+window.closeAddAdvisorModal = closeAddAdvisorModal;
+window.openAssignAdvisor = openAssignAdvisor;
+window.closeAssignAdvisorModal = closeAssignAdvisorModal;
+window.submitAssignment = submitAssignment;
+window.viewStudentCourses = viewStudentCourses;
+window.loadMeetingSlotsAdmin = loadMeetingSlotsAdmin;
+window.submitAdvisorSlot = submitAdvisorSlot;

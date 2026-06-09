@@ -1,3 +1,4 @@
+(function() {
 // Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyDoZebcPthz70oxICYAMm4W43JGXVUkTZE",
@@ -22,7 +23,7 @@ if (typeof firebase !== 'undefined') {
 const apiFetch = (path, options) => {
     if (window.apiFetch && window.apiFetch !== apiFetch) return window.apiFetch(path, options);
     // Fallback if backend_api.js not loaded
-    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://localhost:8000/api/v1';
+    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://127.0.0.1:8001/api/v1';
     const headers = { Accept: 'application/json', ...(options?.headers || {}) };
     const token = localStorage.getItem('edumate_access_token') || sessionStorage.getItem('edumate_access_token');
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -31,298 +32,685 @@ const apiFetch = (path, options) => {
         method: options?.method || 'GET',
         headers,
         body: options?.body
-    }).then(res => res.json());
+    }).then(async res => {
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : null;
+        if (!res.ok) throw new Error(data?.detail || `Request failed (${res.status})`);
+        return data;
+    });
 };
 
+
 // ============================================
-// PLAN / PREVIEW TOGGLE & NEW FEATURES
+// PLANNING - switchPlanningView
 // ============================================
 
 function switchPlanningView(view) {
     document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.planning-view').forEach(v => v.classList.remove('active'));
     
-    if (view === 'plan') {
-        const planBtn = document.querySelector('.toggle-btn:first-child');
-        if (planBtn) planBtn.classList.add('active');
-        const planView = document.getElementById('planning-plan-view');
-        if (planView) planView.classList.add('active');
-    } else {
-        const previewBtn = document.querySelector('.toggle-btn:last-child');
-        if (previewBtn) previewBtn.classList.add('active');
-        const previewView = document.getElementById('planning-preview-view');
-        if (previewView) previewView.classList.add('active');
-        loadCareerTimeline();
-        loadSummerCourses();
-        loadAdvisorSuggestions();
+    const btnMap = { 'plan': 1, 'preview': 2, 'summer': 3, 'academic-plan': 4 };
+    const btn = document.querySelector(`.toggle-btn:nth-child(${btnMap[view]})`);
+    if (btn) btn.classList.add('active');
+    
+    const viewEl = document.getElementById(`planning-${view}-view`);
+    if (viewEl) viewEl.classList.add('active');
+
+    if (view === 'plan') loadStudyPlan();
+    if (view === 'preview') loadCareerTimeline();
+    if (view === 'summer') loadMySummerRequests();
+    if (view === 'academic-plan') {
+        const storedUserStr = sessionStorage.getItem('edumate_current_user');
+        let major = 'Computer Science'; // fallback
+        
+        if (storedUserStr) {
+            try {
+                const userObj = JSON.parse(storedUserStr);
+                major = userObj.major?.name || sessionStorage.getItem('edumate_major_name') || major;
+            } catch (e) {}
+        } else {
+            major = sessionStorage.getItem('edumate_major_name') || major;
+        }
+        
+        let color = '#60a5fa'; // CS color
+        if (major.toLowerCase().includes('cyber')) {
+            color = '#34d399'; // Cyber color
+            major = 'Cyber Security';
+        } else if (major.toLowerCase().includes('data')) {
+            color = '#c084fc'; // DS color
+            major = 'Data Science';
+        } else {
+            major = 'Computer Science';
+        }
+        
+        switchCurriculumMajor(major);
+        
+        const titleEl = document.getElementById('academic-curriculum-title');
+        if (titleEl) {
+            titleEl.innerHTML = `<i class="fas fa-file-invoice" style="color: var(--primary); margin-right:8px;"></i>New Regulation <span style="color:${color}">(${major})</span> Courses`;
+        }
+        
+        loadCurriculumMap();
     }
 }
 
-async function loadCareerTimeline() {
+// ============================================
+// STUDY PLAN (Plan View) - Fetches semesters from DB
+// ============================================
+
+async function loadStudyPlan() {
+    const container = document.getElementById('semester-cards-container');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);grid-column:1/-1;">Loading your plan...</div>';
+
     try {
-        const data = await apiFetch('/planning/timeline/me');
-        const timeline = document.getElementById('career-timeline');
-        if (!timeline) return;
+        const data = await apiFetch('/planning/career-path/me');
+        hydrateCourseGradesFromSemesters(data.semesters || []);
         
-        const careerName = document.getElementById('preview-career-name');
-        if (careerName) careerName.textContent = data.career_path || 'Your Career';
+        const badge = document.getElementById('career-badge-display');
+        if (badge) {
+            badge.innerHTML = `🛡️ ${data.career_path || 'Academic Path'}`;
+        }
+        updateDatabaseGpaDisplays(data.current_gpa);
         
-        timeline.innerHTML = (data.semesters || []).map((s, i) => {
-            const statusClass = (s.status || 'upcoming').replace(' summer', '');
-            const isSummer = (s.status || '').includes('summer');
-            const circleClass = isSummer ? 'summer' : statusClass;
+        if (!data.semesters || !data.semesters.length) {
+            container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted);grid-column:1/-1;">No study plan data found.</div>';
+            return;
+        }
+
+        container.innerHTML = data.semesters.map(s => {
+            const totalCredits = s.courses.reduce((a, c) => a + (c.credits || 0), 0);
+            
             return `
-            <div class="timeline-node">
-                <div class="node-circle ${circleClass}">${i + 1}</div>
-                <div class="node-label">
-                    <div class="node-semester">${s.name || ''}</div>
-                    <div class="node-courses">${s.total_credits || 0} credits</div>
-                    <div class="node-status ${statusClass}-status">
-                        ${statusClass === 'completed' ? '✅ Done' : statusClass === 'current' ? '🔄 Active' : isSummer ? '☀️ Summer' : '📅 Planned'}
+            <div class="semester-item" data-semester="${s.level}" data-semester-name="${s.semester_name}" data-semester-season="${s.semester}">
+                <div class="semester-head">
+                    <div class="sem-info">
+                        <h3>Level ${s.level} - ${s.semester_name}</h3>
+                        <span class="credit-sum">${totalCredits} credits</span>
                     </div>
+                    <div class="sem-status-badge ${s.status}">${s.status.toUpperCase()}</div>
+                </div>
+                <div class="semester-content">
+                    ${s.courses.map(c => `
+                        <div class="course-row" data-course-id="${c.id}">
+                            <span class="course-name">
+                                <i class="fas fa-circle" style="color:${c.status === 'completed' ? '#10b981' : c.status === 'in-progress' ? '#f59e0b' : '#94a3b8'}"></i> 
+                                <span class="course-code">${c.code}:</span> ${c.name}
+                            </span>
+                            <span class="course-credits">${c.credits} cr</span>
+                            <div class="course-actions">
+                                ${c.status === 'completed' ? `<span class="grade-badge" style="background:#10b981; color:white; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:600;">${c.grade || ''}</span>` : ''}
+                                <button class="grade-btn" title="Set Grade" onclick="showGradeModal(this.closest('.course-row'))">
+                                    <i class="fas fa-star"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="semester-actions">
+                    <button class="add-course-btn" onclick="showSemesterGradeModal(this.closest('.semester-item'))">
+                        <i class="fas fa-star"></i> put grades
+                    </button>
+                    <button class="add-course-btn" onclick="showAddSubjectModal(this)">
+                        <i class="fas fa-plus-circle"></i> add subject
+                    </button>
                 </div>
             </div>`;
         }).join('');
-        
-        const total = (data.semesters || []).reduce((a, s) => a + (s.total_credits || 0), 0);
-        const earned = (data.semesters || []).reduce((a, s) => a + (s.completed_credits || 0), 0);
-        const done = (data.semesters || []).filter(s => s.status === 'completed').length;
-        
-        const summaryRow = document.getElementById('path-summary-row');
-        if (summaryRow) {
-            summaryRow.innerHTML = `
-                <div class="path-summary-card"><h4>📊 Progress</h4><div class="summary-value">${data.total_progress || 0}%</div></div>
-                <div class="path-summary-card"><h4>✅ Earned</h4><div class="summary-value">${earned}</div></div>
-                <div class="path-summary-card"><h4>📅 Remaining</h4><div class="summary-value">${total - earned}</div></div>
-                <div class="path-summary-card"><h4>🎯 Done</h4><div class="summary-value">${done}/${(data.semesters || []).length}</div></div>`;
-        }
+
+        // Update overall stats
+        updatePlanningHeaderStats(data);
+        updateGPADisplay();
+        updateSemesterGPADisplays();
+        addFinalGPADisplay();
+
     } catch (e) {
-        console.error('Failed to load timeline:', e);
+        console.error('Study plan error:', e);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;grid-column:1/-1;">Failed to load study plan.</div>';
+    }
+}
+
+function updatePlanningHeaderStats(data) {
+    const totalCredits = data.semesters.reduce((a, s) => a + s.total_credits, 0);
+    const earnedCredits = data.semesters.reduce((a, s) => a + s.completed_credits, 0);
+    const remainingCredits = 128 - earnedCredits; // Assuming 128 is total
+    
+    const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    
+    set('total-credits', totalCredits);
+    set('earned-credits', earnedCredits);
+    set('remaining-credits', Math.max(0, remainingCredits));
+    set('remaining-credits-display', Math.max(0, remainingCredits));
+    
+    const progress = Math.min(Math.round((earnedCredits / 128) * 100), 100);
+    set('progress-percentage', progress + '%');
+    const bar = document.getElementById('progress-bar');
+    if (bar) bar.style.width = progress + '%';
+    
+    const coursesLeft = Math.ceil(remainingCredits / 3);
+    set('courses-left', Math.max(0, coursesLeft));
+}
+
+function updateDatabaseGpaDisplays(gpa) {
+    const numericGpa = Number(gpa);
+    if (!Number.isFinite(numericGpa)) return;
+
+    const formatted = numericGpa.toFixed(2);
+    ['current-gpa', 'preview-gpa-val'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = formatted;
+    });
+}
+
+// ============================================
+// CAREER PATH - Fetches from /planning/career-path/me
+// ============================================
+
+async function loadCareerTimeline() {
+    const timeline = document.getElementById('career-timeline');
+    if (!timeline) return;
+    timeline.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">Loading your academic journey...</div>';
+
+    try {
+        const data = await apiFetch('/planning/career-path/me');
+        
+        // Update stats
+        const total = data.semesters.reduce((a, s) => a + s.courses.length, 0);
+        const completed = data.semesters.reduce((a, s) => a + s.courses.filter(c => c.status === 'completed').length, 0);
+        
+        const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+        const html = (id, val) => { const e = document.getElementById(id); if (e) e.innerHTML = val; };
+        
+        el('path-total-courses', total);
+        el('path-completed-courses', completed);
+        el('path-progress-percent', `${data.total_progress}%`);
+        el('preview-major-name', data.career_path || 'Your Major');
+        el('preview-done-count', `${completed} / ${total}`);
+        el('preview-progress-text', `${data.total_progress}% Complete`);
+        updateDatabaseGpaDisplays(data.current_gpa);
+
+        // Update Career Path Badge and Name
+        html('career-badge-display', `🛡️ ${data.career_path || 'Academic Path'}`);
+        el('career-name-display', data.career_path || 'Academic Path');
+
+        const bar = document.getElementById('preview-main-progress-bar');
+        if (bar) bar.style.width = `${data.total_progress}%`;
+
+        // Render vertical timeline
+        if (!data.semesters.length) {
+            timeline.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted);">No study plan found. Ask your advisor to set up your curriculum.</div>';
+            return;
+        }
+
+        timeline.innerHTML = data.semesters.map(s => {
+            const statusClass = s.status === 'completed' ? 'completed' : s.status === 'in-progress' ? 'in-progress' : 'upcoming';
+            const pct = s.total_credits > 0 ? Math.round(s.completed_credits / s.total_credits * 100) : 0;
+            
+            // Map Level/Semester to Semester Number
+            let semLabel = `Semester ${(s.level - 1) * 2 + (s.semester_name === 'Spring' ? 2 : 1)}`;
+            if (s.semester_name === 'Summer') semLabel = `Summer ${s.level}`;
+
+            const allCompleted = s.courses.every(c => c.status === 'completed');
+            const anyCompleted = s.courses.some(c => c.status === 'completed');
+            const semBadge = allCompleted ? 'COMPLETED' : anyCompleted ? 'IN PROGRESS' : 'UPCOMING';
+
+            return `
+            <div class="timeline-vertical-item">
+                <div class="timeline-vertical-header">
+                    <span class="timeline-icon">${allCompleted ? '✅' : anyCompleted ? '🔄' : '⏳'}</span>
+                    <span class="timeline-title">${semLabel}</span>
+                    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:0.75rem;color:var(--muted);">${pct}% done</span>
+                        <span class="timeline-badge ${statusClass}">${semBadge}</span>
+                    </div>
+                </div>
+                <div class="timeline-vertical-content">
+                    ${s.courses.map(c => {
+                        const isDone = c.status === 'completed';
+                        const dotColor = isDone ? '#10b981' : c.status === 'in_progress' || c.status === 'enrolled' ? '#f59e0b' : '#6b7280';
+                        const courseIcon = isDone ? '✅' : c.status === 'in_progress' || c.status === 'enrolled' ? '🔄' : '📘';
+                        return `
+                        <div class="timeline-course-row" style="opacity:${isDone ? '1' : '0.65'}">
+                            <span class="course-icon">${courseIcon}</span>
+                            <div class="course-info-row">
+                                <div class="course-name-row">${c.code} – ${c.name}</div>
+                                <div class="course-meta-row">${c.credits} CH
+                                    ${isDone && c.grade ? `• Grade: <strong style="color:#10b981">${c.grade}</strong>` : ''}
+                                    ${!isDone ? `• <em style="color:#94a3b8">${c.status.charAt(0).toUpperCase() + c.status.slice(1)}</em>` : ''}
+                                </div>
+                            </div>
+                            <span class="course-status-dot" style="
+                                width:10px;height:10px;border-radius:50%;margin-left:auto;flex-shrink:0;
+                                background:${dotColor}
+                            "></span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }).join('');
+
+    } catch (e) {
+        console.error('Career timeline error:', e);
+        if (timeline) timeline.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;">Failed to load career path. Make sure you are logged in.</div>';
     }
 }
 
 // ============================================
-// SUMMER COURSE REQUEST - Simple: load from DB, student picks, saves to DB
+// ACADEMIC PLAN - Grouped by Semester
 // ============================================
 
-async function loadSummerCourses() {
+async function loadAcademicPlan() {
+    const container = document.getElementById('academic-plan-container');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Loading academic plan...</div>';
+
     try {
-        const data = await apiFetch('/planning/summer-courses/me');
-        const container = document.getElementById('summer-course-list');
-        if (!container) return;
-        
-        if (!data || !data.length) {
-            container.innerHTML = '<p style="color:#92400e;font-size:0.9rem;">No summer courses available for your program.</p>';
+        const [planRows, careerData] = await Promise.all([
+            apiFetch('/planning/study-plan'),
+            apiFetch('/planning/career-path/me').catch(() => ({ semesters: [] }))
+        ]);
+
+        if (!planRows || !planRows.length) {
+            container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted);">No academic plan data found for your major.</div>';
             return;
         }
-        
-        container.innerHTML = data.map(c => `
-            <div class="summer-course-item" id="summer-item-${c.id}">
-                <div class="summer-course-info">
-                    <span class="summer-course-code">${c.code}</span>
-                    <span class="summer-course-name">${c.name}</span>
-                    <span class="summer-course-credits">(${c.credits} cr)</span>
-                    ${!c.prerequisite_met ? 
-                        `<span style="color:#ef4444;font-size:0.7rem;">⚠️ Need: ${c.prerequisite?.code || 'N/A'}</span>` : 
-                        `<span style="color:#10b981;font-size:0.7rem;">✅ Ready</span>`
-                    }
+
+        // 1. Build a map of all courses the student has interacted with (taken, planned, etc.)
+        const studentCourseMap = {}; // course_id -> status/grade/semester
+        (careerData.semesters || []).forEach(s => {
+            s.courses.forEach(c => {
+                studentCourseMap[c.id] = { 
+                    status: c.status, 
+                    grade: c.grade, 
+                    semester: c.semester,
+                    icon: c.icon,
+                    course: c.course // backend includes course details here
+                };
+            });
+        });
+
+        // 2. Group everything by Semester (Level + Semester Name)
+        const grouped = {};
+        const getGroup = (level, semester) => {
+            const key = `${level}_${semester}`;
+            if (!grouped[key]) {
+                grouped[key] = { level, semester, courses: [], extra: [] };
+            }
+            return grouped[key];
+        };
+
+        // Track which courses from study_plan we've already added
+        const planCourseIds = new Set();
+
+        // Add all courses from the official Study Plan
+        planRows.forEach(row => {
+            if (!row.course) return;
+            planCourseIds.add(row.course_id);
+            
+            const g = getGroup(row.level || 1, row.semester);
+            const sc = studentCourseMap[row.course_id];
+            
+            g.courses.push({
+                id: row.course_id,
+                code: row.course.code,
+                name: row.course.name,
+                credits: row.course.credits,
+                status: sc ? sc.status : 'upcoming',
+                grade: sc ? sc.grade : null,
+                is_in_plan: true
+            });
+        });
+
+        // Add extra courses the student took that are NOT in the official plan
+        Object.keys(studentCourseMap).forEach(cid => {
+            const id = parseInt(cid);
+            if (!planCourseIds.has(id)) {
+                const sc = studentCourseMap[cid];
+                // Try to find which semester this "extra" course belongs to
+                // If it has a semester string like "Fall", we can try to guess level 1
+                let level = 1;
+                let semName = sc.semester || 'Fall';
+                
+                // If the semester is "Semester 3", we can guess Level 2 Fall
+                if (semName.startsWith('Semester ')) {
+                    const semNum = parseInt(semName.replace('Semester ', ''));
+                    level = Math.ceil(semNum / 2);
+                    semName = (semNum % 2 === 0) ? 'Spring' : 'Fall';
+                }
+
+                const g = getGroup(level, semName);
+                g.courses.push({
+                    id: id,
+                    code: sc.course?.code || 'N/A',
+                    name: sc.course?.name || 'Extra Course',
+                    credits: sc.course?.credits || 0,
+                    status: sc.status,
+                    grade: sc.grade,
+                    is_in_plan: false
+                });
+            }
+        });
+
+        // Sort semesters
+        const sortedKeys = Object.keys(grouped).sort((a, b) => {
+            const [aL, aS] = a.split('_');
+            const [bL, bS] = b.split('_');
+            if (parseInt(aL) !== parseInt(bL)) return parseInt(aL) - parseInt(bL);
+            const order = { 'Fall': 1, 'Spring': 2, 'Summer': 3 };
+            return (order[aS] || 99) - (order[bS] || 99);
+        });
+
+        let totalCH = 0;
+        container.innerHTML = sortedKeys.map(key => {
+            const g = grouped[key];
+            const semCH = g.courses.reduce((a, c) => a + (c.credits || 0), 0);
+            totalCH += semCH;
+
+            let semLabel = `Semester ${(g.level - 1) * 2 + (g.semester === 'Spring' ? 2 : 1)}`;
+            if (g.semester === 'Summer') semLabel = `Summer ${g.level}`;
+
+            return `
+            <div class="semester-group" style="margin-bottom:30px; background:rgba(255,255,255,0.02); border-radius:15px; border:1px solid var(--border); overflow:hidden;">
+                <div class="semester-header" style="background:rgba(255,255,255,0.03); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+                    <div style="font-weight:700; color:var(--primary); font-size:1rem;">
+                        <i class="fas fa-layer-group"></i> ${semLabel} <span style="font-weight:400; font-size:0.8rem; color:var(--muted); margin-left:10px;">(${g.semester})</span>
+                    </div>
+                    <div style="font-size:0.85rem; color:var(--muted);">
+                        ${g.courses.length} Courses | Total CH: ${semCH.toFixed(2)}
+                    </div>
                 </div>
-                <button class="request-this-btn" 
-                        id="request-btn-${c.id}"
-                        onclick="requestSummerCourse(${c.id}, '${c.name.replace(/'/g, "\\'")}')">
-                    📝 Request
-                </button>
-            </div>
-        `).join('');
+                <div class="semester-table-wrapper" style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:0.85rem; min-width:650px;">
+                        <thead>
+                            <tr style="background:rgba(0,0,0,0.2); color:var(--primary); text-align:left;">
+                                <th style="padding:12px 20px;">Course Code</th>
+                                <th style="padding:12px 20px;">Course Title (EN)</th>
+                                <th style="padding:12px 20px; text-align:center;">Credit Hours</th>
+                                <th style="padding:12px 20px; text-align:center;">Status</th>
+                                <th style="padding:12px 20px; text-align:center;">Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${g.courses.map(c => {
+                                const isDone = c.status === 'completed';
+                                const isInProgress = c.status === 'in_progress' || c.status === 'enrolled';
+                                const isPlanned = c.status === 'planned';
+                                
+                                const statusColor = isDone ? '#10b981' : isInProgress ? '#f59e0b' : isPlanned ? '#3b82f6' : '#94a3b8';
+                                const statusLabel = isDone ? 'Completed' : isInProgress ? 'In Progress' : isPlanned ? 'Planned' : 'Upcoming';
+                                
+                                return `
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.03); transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                                    <td style="padding:12px 20px; color:var(--primary); font-weight:600;">
+                                        ${c.code || 'N/A'}
+                                        ${!c.is_in_plan ? '<span title="Elective/Extra" style="font-size:0.6rem; color:#f59e0b; margin-left:5px;">[+]</span>' : ''}
+                                    </td>
+                                    <td style="padding:12px 20px; color:#cbd5e1;">${c.name || '---'}</td>
+                                    <td style="padding:12px 20px; text-align:center; color:#94a3b8;">${(c.credits || 0).toFixed(2)}</td>
+                                    <td style="padding:12px 20px; text-align:center;">
+                                        <span style="color:${statusColor}; background:${statusColor}15; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:600;">
+                                            ${statusLabel}
+                                        </span>
+                                    </td>
+                                    <td style="padding:12px 20px; text-align:center; color:${isDone ? '#10b981' : 'var(--muted)'}; font-weight:${isDone ? '700' : '400'}; font-size:0.95rem;">
+                                        ${c.grade || (isDone ? 'N/A' : '--')}
+                                    </td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }).join('');
+
+        const totalEl = document.getElementById('academic-total-ch');
+        if (totalEl) totalEl.textContent = totalCH.toFixed(2);
+
     } catch (e) {
-        console.error('Failed to load summer courses:', e);
+        console.error('Academic plan error:', e);
+        container.innerHTML = `<div style="text-align:center;padding:2rem;color:#ef4444;">Failed to load academic plan: ${e.message}</div>`;
+    }
+}
+
+async function loadMySummerRequests() {
+    const container = document.getElementById('summer-requests-list');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--muted);">Loading...</div>';
+
+    try {
+        const requests = await apiFetch('/planning/requests/me');
+
+        if (!requests || !requests.length) {
+            container.innerHTML = `
+                <div style="text-align:center;padding:3rem;color:var(--muted);">
+                    <div style="font-size:2.5rem;margin-bottom:1rem;">☀️</div>
+                    <div style="font-weight:600;margin-bottom:0.5rem;">No requests yet</div>
+                    <div style="font-size:0.875rem;">Click "New Request" to request a summer course</div>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = requests.map(r => {
+            const statusColor = r.status === 'approved' ? '#10b981' : r.status === 'rejected' ? '#ef4444' : '#f59e0b';
+            const statusIcon = r.status === 'approved' ? '✅' : r.status === 'rejected' ? '❌' : '⏳';
+            const courseName = r.course ? `${r.course.code} – ${r.course.name}` : `Course #${r.course_id}`;
+            const date = r.requested_at ? new Date(r.requested_at).toLocaleDateString() : 'N/A';
+
+            return `
+            <div class="request-card" style="
+                background:var(--card);border:1px solid var(--border);border-radius:12px;
+                padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.95rem;margin-bottom:4px;">${courseName}</div>
+                    <div style="font-size:0.8rem;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;">
+                        <span>📅 ${r.semester || 'Summer'}</span>
+                        <span>🕐 Requested: ${date}</span>
+                        ${r.reason ? `<span>📝 ${r.reason.substring(0, 50)}${r.reason.length > 50 ? '...' : ''}</span>` : ''}
+                    </div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
+                    <div style="
+                        background:${statusColor}20;color:${statusColor};
+                        padding:4px 12px;border-radius:999px;font-size:0.8rem;font-weight:600;
+                        border:1px solid ${statusColor}40;white-space:nowrap;">
+                        ${statusIcon} ${r.status.toUpperCase()}
+                    </div>
+                    ${r.status === 'pending' ? `
+                        <button onclick="cancelSummerRequest(${r.id})" 
+                            style="background:none;border:1px solid #ef4444;color:#ef4444;
+                            padding:3px 10px;border-radius:6px;font-size:0.75rem;cursor:pointer;">
+                            Cancel
+                        </button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Load requests error:', e);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;">Failed to load requests. Make sure you are logged in.</div>';
+    }
+}
+
+async function showSummerRequestModal() {
+    const modal = document.getElementById('summer-request-modal');
+    if (modal) modal.classList.add('active');
+    await loadCoursesForRequestDropdown();
+}
+
+function closeSummerRequestModal() {
+    const modal = document.getElementById('summer-request-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function loadCoursesForRequestDropdown() {
+    const select = document.getElementById('summer-request-course-id');
+    if (!select) return;
+    select.innerHTML = '<option value="">Loading courses...</option>';
+
+    try {
+        // Try recommended first, fallback to all courses
+        let courses = [];
+        try {
+            courses = await apiFetch('/planning/summer-courses/me');
+        } catch {}
+
+        if (!courses || !courses.length) {
+            courses = await apiFetch('/planning/courses');
+        }
+
+        if (courses && courses.length) {
+            select.innerHTML = '<option value="">Select a course...</option>' +
+                courses.map(c => {
+                    const prereqNote = c.prerequisite_met === false ? ` (Needs: ${c.prerequisite?.code || 'prereq'})` : '';
+                    const disabled = c.prerequisite_met === false ? 'disabled' : '';
+                    const name = c.code ? `${c.code} – ${c.name}${prereqNote}` : `${c.name}${prereqNote}`;
+                    return `<option value="${c.id}" ${disabled}>${name}</option>`;
+                }).join('');
+        } else {
+            select.innerHTML = '<option value="">No courses available</option>';
+        }
+    } catch (e) {
+        console.error('Course dropdown error:', e);
+        select.innerHTML = '<option value="">Error loading courses</option>';
+    }
+}
+
+async function submitSummerRequest() {
+    const courseId = document.getElementById('summer-request-course-id')?.value;
+    const semester = document.getElementById('summer-request-semester')?.value || 'Summer 2026';
+    const reason = document.getElementById('summer-request-reason')?.value || '';
+
+    if (!courseId) {
+        showNotification('Please select a course', 'error');
+        return;
+    }
+
+    const btn = document.querySelector('#summer-request-modal .btn[onclick="submitSummerRequest()"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+
+    try {
+        await apiFetch('/planning/summer-courses/request', {
+            method: 'POST',
+            body: JSON.stringify({ course_id: parseInt(courseId), semester, reason })
+        });
+        showNotification('Request submitted! Admin will review it.', 'success');
+        closeSummerRequestModal();
+        loadMySummerRequests();
+    } catch (e) {
+        console.error('Submit request error:', e);
+        showNotification('Failed to submit request. Make sure you are logged in.', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Submit Request'; }
+    }
+}
+
+async function cancelSummerRequest(requestId) {
+    if (!confirm('Cancel this summer course request?')) return;
+    try {
+        await apiFetch(`/planning/requests/${requestId}`, { method: 'DELETE' });
+        showNotification('Request cancelled', 'info');
+        loadMySummerRequests();
+    } catch (e) {
+        showNotification('Failed to cancel request', 'error');
     }
 }
 
 async function requestSummerCourse(courseId, courseName) {
-    const button = document.getElementById(`request-btn-${courseId}`);
-    if (!button) return;
-    
-    button.disabled = true;
-    button.textContent = '⏳ Sending...';
-    
-    try {
-        await apiFetch('/planning/summer-courses/request', {
-            method: 'POST',
-            body: JSON.stringify({ course_id: courseId, course_name: courseName })
-        });
-        
-        button.textContent = '✅ Requested';
-        button.classList.add('requested');
-        button.style.background = '#10b981';
-        button.style.border = '1px solid #10b981';
-        button.style.color = 'white';
-        button.disabled = true;
-        
-        showNotification(`Request for "${courseName}" submitted! Admin will review it.`, 'success');
-    } catch (e) {
-        button.disabled = false;
-        button.textContent = '📝 Request';
-        showNotification('Failed to submit request. Try again.', 'error');
-    }
+    // Pre-fill modal with this course
+    const modal = document.getElementById('summer-request-modal');
+    if (modal) modal.classList.add('active');
+    await loadCoursesForRequestDropdown();
+    const select = document.getElementById('summer-request-course-id');
+    if (select) select.value = courseId;
 }
 
 function viewAllSummerCourses() {
-    // Just scroll to the summer section in the plan view
-    const section = document.getElementById('summer-request-section');
-    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    switchPlanningView('summer');
+}
+
+// ============================================
+// ADVISOR CHAT - Real human-to-admin messaging
+// ============================================
+
+async function loadAdvisorChat() {
+    const container = document.getElementById('advisor-chat-messages');
+    if (!container) return;
+
+    try {
+        const messages = await apiFetch('/planning/advisor-messages');
+
+        if (!messages || !messages.length) {
+            container.innerHTML = `
+                <div class="advisor-message ai" style="display:flex;gap:10px;margin-bottom:12px;">
+                    <div class="advisor-avatar ai-avatar">🎓</div>
+                    <div class="advisor-bubble">Hello! I'm your Academic Advisor. How can I help you with your studies today? You can ask me about courses, prerequisites, summer programs, or graduation requirements.</div>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = messages.map(m => {
+            const isStudent = m.sender_role === 'student';
+            const time = m.created_at ? new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+            return `
+            <div class="chat-msg-row ${isStudent ? 'student' : 'advisor'}">
+                <div class="chat-avatar">${isStudent ? '👤' : '🎓'}</div>
+                <div class="chat-bubble-container">
+                    <div class="chat-bubble">${m.content}</div>
+                    ${time ? `<div class="chat-time">${time}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+        container.scrollTop = container.scrollHeight;
+    } catch (e) {
+        console.error('Load advisor chat error:', e);
+        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;">Failed to load messages. Make sure you are logged in.</div>';
+    }
 }
 
 async function sendAdvisorMessage() {
     const input = document.getElementById('advisor-chat-input');
-    const container = document.getElementById('advisor-chat-messages');
-    if (!input || !container) return;
-    const msg = input.value.trim();
-    if (!msg) return;
-    
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return;
+
     input.value = '';
-    appendAdvisorBubble(container, 'user', msg);
-    
+
+    // Optimistically render
+    const container = document.getElementById('advisor-chat-messages');
+    if (container) {
+        const div = document.createElement('div');
+        div.className = 'chat-msg-row student';
+        div.innerHTML = `
+            <div class="chat-avatar">👤</div>
+            <div class="chat-bubble-container">
+                <div class="chat-bubble">${content}</div>
+            </div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
     try {
-        const data = await apiFetch('/planning/advisor/chat', {
+        await apiFetch('/planning/advisor-messages', {
             method: 'POST',
-            body: JSON.stringify({ message: msg, channel: 'planning_advisor' })
+            body: JSON.stringify({ content })
         });
-        appendAdvisorBubble(container, 'ai', data.message || 'No response');
-        updateAdvisorSuggestions(data.suggestions || []);
+        // Reload to get proper server-side data
+        setTimeout(() => loadAdvisorChat(), 500);
     } catch (e) {
-        appendAdvisorBubble(container, 'ai', 'Sorry, could not process your request. Try again.');
+        console.error('Send advisor message error:', e);
+        showNotification('Failed to send message. Make sure you are logged in.', 'error');
     }
 }
 
-function sendAdvisorQuickMessage(msg) {
+function sendAdvisorQuickMessage(text) {
     const input = document.getElementById('advisor-chat-input');
-    if (input) input.value = msg;
-    sendAdvisorMessage();
-}
-
-function appendAdvisorBubble(container, type, text) {
-    const div = document.createElement('div');
-    div.className = `advisor-message ${type}`;
-    div.innerHTML = `
-        <div class="advisor-avatar ${type === 'ai' ? 'ai-avatar' : 'user-avatar'}">${type === 'ai' ? '🤖' : '👤'}</div>
-        <div class="advisor-bubble">${(text || '').replace(/\n/g, '<br>')}</div>`;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-}
-
-function updateAdvisorSuggestions(suggestions) {
-    const container = document.getElementById('advisor-suggestions');
-    if (!container) return;
-    container.innerHTML = (suggestions || []).map(s => 
-        `<span class="suggestion-chip" onclick="sendAdvisorQuickMessage('${s}')">${s}</span>`
-    ).join('');
+    if (input) { input.value = text; sendAdvisorMessage(); }
 }
 
 function loadAdvisorSuggestions() {
-    updateAdvisorSuggestions([
-        'What courses should I take next?',
-        'Are there summer courses?',
-        'Show graduation timeline',
-        'Check my prerequisites'
-    ]);
+    // No-op - suggestions are now static chips in HTML
 }
 
-// Global Variables
-let users = JSON.parse(localStorage.getItem('edumate_users')) || {};
-let resumeData = {
-    name: "Mohamed Ahmed",
-    title: "Software Engineer",
-    email: "mohamed@example.com",
-    phone: "+20 123 456 7890",
-    location: "Cairo, Egypt",
-    linkedin: "linkedin.com/in/mohamed",
-    github: "github.com/mohamed",
-    education: [
-        { degree: "B.Sc Computer Science", school: "Cairo University", year: "2022 – 2026" }
-    ],
-    experience: [
-        { title: "Frontend Developer Intern", company: "TechCorp", dates: "Summer 2024", desc: "Built responsive web apps using React and Tailwind" }
-    ],
-    skills: "Python, JavaScript, React, Node.js, SQL, Git, AWS",
-    projects: []
-};
-
-if (localStorage.getItem('edumate_resume')) {
-    resumeData = JSON.parse(localStorage.getItem('edumate_resume'));
-}
-
-const InternshipsData = [
-    { title: 'Software Engineer', company: 'Iskraemco', match: 92, reason: 'Strong Python + SQL skills', salary: '$65K - $85K', applyUrl: 'https://iskraemeco.com/' },
-    { title: 'Frontend Developer', company: 'Amazon', match: 88, reason: 'JavaScript experience', salary: '$70K - $90K', applyUrl: 'https://www.amazon.Internships/en/Internships/123456/frontend-developer' },
-    { title: 'Data Analyst', company: 'e&', match: 85, reason: 'Analytical skills', salary: '$60K - $80K', applyUrl: 'https://www.eand.com.eg/StaticFiles/career/#/home' }
-];
-
-const coursesData = {
-    tech: [
-        { id: 1, title: "Full Stack Web Development", provider: "Coursera", category: "tech", difficulty: "beginner", duration: "12 weeks", progress: 75, enrolled: true, description: "Learn HTML, CSS, JavaScript, React, Node.js and MongoDB", image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.coursera.org/specializations/full-stack-react" },
-        { id: 2, title: "Python for Data Science", provider: "edX", category: "tech", difficulty: "intermediate", duration: "8 weeks", progress: 40, enrolled: true, description: "Master Python, NumPy, Pandas, and data visualization", image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.edx.org/course/python-for-data-science" },
-        { id: 3, title: "Machine Learning Fundamentals", provider: "Udacity", category: "tech", difficulty: "advanced", duration: "16 weeks", progress: 20, enrolled: true, description: "Learn algorithms, neural networks, and AI principles", image: "https://images.unsplash.com/photo-1555255707-c07966088b7b?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.udacity.com/course/intro-to-machine-learning--ud120" }
-    ],
-    business: [
-        { id: 4, title: "Digital Marketing Strategy", provider: "Google", category: "business", difficulty: "beginner", duration: "6 weeks", progress: 0, enrolled: false, description: "Learn SEO, social media, and content marketing", image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://learndigital.withgoogle.com/digitalgarage" }
-    ],
-    "soft-skills": [
-        { id: 5, title: "Effective Communication", provider: "LinkedIn Learning", category: "soft-skills", difficulty: "beginner", duration: "4 weeks", progress: 0, enrolled: false, description: "Improve your professional communication skills", image: "https://images.unsplash.com/photo-1551836026-d5c2c0b4d1c1?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.linkedin.com/learning" }
-    ],
-    career: [
-        { id: 6, title: "Job Interview Mastery", provider: "Udemy", category: "career", difficulty: "intermediate", duration: "5 weeks", progress: 0, enrolled: false, description: "Ace your interviews with confidence", image: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80", link: "https://www.udemy.com/course/job-interview-mastery" }
-    ]
-};
-
-const COURSES_API_KEY = 'AIzaSyBkyGUHoOohj6VSZYbRLUa4mysfRgV5FTY';
-const COURSES_CX = 'c77318ddf11b04d7d';
-let currentSearchResults = [], currentPage = 1, itemsPerPage = 9, currentSearchQuery = '';
-
-async function searchCourses(query = null, page = 1) { /* ... unchanged ... */ }
-async function searchGoogleCourses(query, startIndex = 1) { /* ... unchanged ... */ }
-function setupPagination(totalPages, currentPage, query) { /* ... unchanged ... */ }
-function setupSimplePagination(hasMore, currentPage, query) { /* ... unchanged ... */ }
-function quickSearch(topic) { document.getElementById('course-search-input').value = topic; searchCourses(topic, 1); }
-function extractPlatform(url, title) { /* ... unchanged ... */ }
-function saveCustomCourse(itemData) { if (window.saveCustomCourse && window.saveCustomCourse !== saveCustomCourse) return window.saveCustomCourse.apply(this, arguments); }
-function getImageFromItem(item) { /* ... unchanged ... */ }
-
-function initializeApp() {
-    updateSidebarFromStorage(); applyStoredProfileToUI();
-    const logged = sessionStorage.getItem('edumate_logged') === '1';
-    const seenWelcome = localStorage.getItem('edumate_seen_welcome') === '1';
-    if (!logged && !seenWelcome) { navigateTo('welcome'); localStorage.setItem('edumate_seen_welcome', '1'); }
-    else if (logged) { navigateTo('dashboard'); }
-    else { navigateTo('login'); }
-}
-
-function setupEventListeners() {
-    document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
-    document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
-    document.getElementById('ai-chat-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendAIChatMessage(); });
-    document.getElementById('ai-popup-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendAIPopupMessage(); });
-}
-
-function toggleTheme() { document.body.classList.toggle('dark-theme'); localStorage.setItem('edumate_theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light'); updateThemeIcon(); }
-function updateThemeIcon() { const t = document.getElementById('theme-toggle'); if (t) t.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙'; }
-function toggleSidebar() { /* ... unchanged ... */ }
-function attemptLogin() { if (window.attemptLogin && window.attemptLogin !== attemptLogin) return window.attemptLogin.apply(this, arguments); }
-function firebaseLogin(providerType) { /* ... unchanged ... */ }
-function integrateSocialUser(socialUser) { /* ... unchanged ... */ }
-function loginUser(username, remember) { if (window.loginUser && window.loginUser !== loginUser) return window.loginUser.apply(this, arguments); }
-function signOut() { if (window.signOut && window.signOut !== signOut) return window.signOut.apply(this, arguments); }
-function startRegistration() { /* ... unchanged ... */ }
-function fillInfoPageFromTemp() { /* ... unchanged ... */ }
-function previewInfoAvatar(input) { /* ... unchanged ... */ }
-function completeRegistration() { if (window.completeRegistration && window.completeRegistration !== completeRegistration) return window.completeRegistration.apply(this, arguments); }
-function updateSidebarFromStorage() { if (window.updateSidebarFromStorage && window.updateSidebarFromStorage !== updateSidebarFromStorage) return window.updateSidebarFromStorage.apply(this, arguments); }
-function applyStoredProfileToUI() { if (window.applyStoredProfileToUI && window.applyStoredProfileToUI !== applyStoredProfileToUI) return window.applyStoredProfileToUI.apply(this, arguments); }
-function changeProfileAvatar(input) { /* ... unchanged ... */ }
-function saveProfileEdits() { if (window.saveProfileEdits && window.saveProfileEdits !== saveProfileEdits) return window.saveProfileEdits.apply(this, arguments); }
-function toggleAIPopup() { document.getElementById('aiPopup').classList.toggle('active'); }
-function sendAIChatMessage() { if (window.sendAIChatMessage && window.sendAIChatMessage !== sendAIChatMessage) return window.sendAIChatMessage.apply(this, arguments); }
-function sendAIPopupMessage() { if (window.sendAIPopupMessage && window.sendAIPopupMessage !== sendAIPopupMessage) return window.sendAIPopupMessage.apply(this, arguments); }
 
 // Load resume data from localStorage
 if (localStorage.getItem('edumate_resume')) {
@@ -758,8 +1146,17 @@ function getImageFromItem(item) {
 
 // Initialize Application
 function initializeApp() {
+    const storedTheme = localStorage.getItem('edumate_theme');
+    if (storedTheme === 'dark') document.body.classList.add('dark-theme');
+    updateThemeIcon();
+    
+    initCoursesPage();
     updateSidebarFromStorage();
     applyStoredProfileToUI();
+    setupEventListeners();
+
+    // Fetch real stats from DB
+    updatePlanningHeaderStats();
     
     const logged = sessionStorage.getItem('edumate_logged') === '1';
     const seenWelcome = localStorage.getItem('edumate_seen_welcome') === '1';
@@ -2342,8 +2739,23 @@ function loadSavedGrades() {
     }
 }
 
+window.loadInternshipsFromSearch = loadInternshipsByPosition;
+
 function saveGrades() {
     localStorage.setItem('edumate_course_grades', JSON.stringify(courseGrades));
+}
+
+function hydrateCourseGradesFromSemesters(semesters) {
+    courseGrades = {};
+    (semesters || []).forEach(semester => {
+        (semester.courses || []).forEach(course => {
+            const courseId = course.id?.toString();
+            if (courseId && course.status === 'completed' && course.grade && GRADE_POINTS[course.grade] !== undefined) {
+                courseGrades[courseId] = course.grade;
+            }
+        });
+    });
+    saveGrades();
 }
 
 function calculateGPA() {
@@ -2396,11 +2808,10 @@ function calculateCGPA() {
                 const credits = parseInt(match[1]);
                 const grade = courseGrades[courseId] || null;
                 
-                totalCredits += credits;
-                totalCourses++;
-                
                 if (grade && GRADE_POINTS[grade] !== undefined) {
                     totalWeightedPoints += GRADE_POINTS[grade] * credits;
+                    totalCredits += credits;
+                    totalCourses++;
                 }
             }
         }
@@ -2595,40 +3006,264 @@ function showGradeModal(courseRow) {
     document.body.appendChild(modal);
 }
 
-function setGrade(courseId, grade) {
-    courseGrades[courseId] = grade;
-    saveGrades();
-    updateGPADisplay();
-    
-    const courseRow = document.querySelector(`[data-course-id="${courseId}"]`);
-    if (courseRow) {
-        const existingBadge = courseRow.querySelector('.grade-badge');
-        if (existingBadge) existingBadge.remove();
+function renderGradeOptions(currentGrade = '') {
+    return `
+        <option value="">Not completed yet</option>
+        ${Object.entries(GRADE_POINTS).map(([grade, points]) => `
+            <option value="${grade}" ${currentGrade === grade ? 'selected' : ''}>${grade} (${points})</option>
+        `).join('')}
+    `;
+}
+
+async function getSemesterGradeRows(semesterEl) {
+    const level = parseInt(semesterEl.dataset.semester || '0', 10);
+    const semesterName = semesterEl.dataset.semesterName || '';
+
+    const data = await apiFetch('/planning/career-path/me');
+    const semester = (data.semesters || []).find(item => (
+        parseInt(item.level, 10) === level && String(item.semester_name || '') === semesterName
+    ));
+
+    hydrateCourseGradesFromSemesters(data.semesters || []);
+
+    if (!semester?.courses?.length) {
+        return [];
+    }
+
+    return semester.courses.map(course => ({
+        id: course.id,
+        code: course.code || '',
+        name: course.name || 'Subject',
+        credits: course.credits || 0,
+        status: course.status || 'upcoming',
+        grade: course.status === 'completed' ? (course.grade || '') : '',
+    }));
+}
+
+async function showSemesterGradeModal(semesterEl) {
+    if (!semesterEl) return;
+
+    const semesterTitle = semesterEl.querySelector('.sem-info h3')?.textContent?.trim() || 'This level';
+    const modal = document.createElement('div');
+    modal.className = 'grade-modal grade-page';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #0f172a;
+        z-index: 2000;
+        overflow: auto;
+        padding: 32px;
+    `;
+
+    const renderShell = content => `
+        <div style="max-width: 1040px; margin: 0 auto; color: #e2e8f0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+                <div>
+                    <h2 style="margin:0; color:#f8fafc; font-size:2rem;">Put Your Grades</h2>
+                    <p style="margin:0.35rem 0 0; color:#94a3b8;">${escapeHtml(semesterTitle)} subjects loaded from your database study plan</p>
+                </div>
+                <button onclick="this.closest('.grade-modal').remove()" class="link-btn" style="border-color:rgba(96,165,250,0.45); color:#60a5fa; padding:10px 18px;">
+                    <i class="fas fa-arrow-left"></i> Back to Plan
+                </button>
+            </div>
+            ${content}
+        </div>
+    `;
+
+    modal.innerHTML = renderShell(`
+        <div style="background:#1e293b; border:1px solid rgba(96,165,250,0.35); border-radius:24px; padding:48px; text-align:center;">
+            <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:#60a5fa;"></i>
+            <div style="margin-top:1rem; color:#cbd5e1; font-weight:700;">Loading courses from database...</div>
+        </div>
+    `);
+
+    document.body.appendChild(modal);
+
+    try {
+        const rows = await getSemesterGradeRows(semesterEl);
+
+        if (!rows.length) {
+            modal.innerHTML = renderShell(`
+                <div style="background:#1e293b; border:1px solid rgba(96,165,250,0.35); border-radius:24px; padding:48px; text-align:center;">
+                    <div style="color:#cbd5e1; font-weight:800;">No courses found for this level in the database.</div>
+                </div>
+            `);
+            return;
+        }
+
+        modal.innerHTML = renderShell(`
+            <div style="background:#1e293b; border:1px solid rgba(96,165,250,0.35); border-radius:24px; padding:22px; box-shadow:0 24px 80px rgba(0,0,0,0.25);">
+                <div style="display:grid; grid-template-columns:minmax(0, 1fr) 130px 150px 180px; gap:1rem; padding:0 12px 12px; color:#94a3b8; font-weight:800; font-size:0.8rem; text-transform:uppercase;">
+                    <span>Subject</span>
+                    <span>Credits</span>
+                    <span>Database Status</span>
+                    <span>Grade</span>
+                </div>
+                <div style="display:grid; gap:0.75rem;">
+                    ${rows.map(row => {
+                        const courseId = String(row.id);
+                        const currentGrade = row.grade || courseGrades[courseId] || '';
+                        return `
+                            <label style="display:grid; grid-template-columns:minmax(0, 1fr) 130px 150px 180px; gap:1rem; align-items:center; padding:1rem 12px; border:1px solid rgba(148,163,184,0.18); border-radius:16px; background:rgba(15,23,42,0.45);">
+                                <span style="min-width:0;">
+                                    <strong style="display:block; color:#f8fafc; font-size:1rem;">${escapeHtml(row.code)}: ${escapeHtml(row.name)}</strong>
+                                </span>
+                                <span style="color:#cbd5e1; font-weight:800;">${escapeHtml(String(row.credits || 0))} cr</span>
+                                <span style="color:${row.status === 'completed' ? '#34d399' : '#94a3b8'}; font-weight:800; text-transform:capitalize;">${escapeHtml(String(row.status || 'upcoming').replace('_', ' '))}</span>
+                                <select class="semester-grade-select" data-course-id="${escapeHtml(courseId)}" style="width:100%; padding:0.7rem; border:1px solid rgba(148,163,184,0.35); border-radius:12px; color:#e2e8f0; background:#334155;">
+                                    ${renderGradeOptions(currentGrade)}
+                                </select>
+                            </label>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1.5rem;">
+                <button onclick="this.closest('.grade-modal').remove()" class="link-btn" style="padding:10px 18px;">Cancel</button>
+                <button onclick="saveSemesterGrades(this.closest('.grade-modal'))" class="btn" style="padding:10px 22px;">
+                    <i class="fas fa-save"></i> Save Grades
+                </button>
+            </div>
+        `);
+    } catch (error) {
+        console.error('Could not load semester grades from database:', error);
+        modal.innerHTML = renderShell(`
+            <div style="background:#1e293b; border:1px solid rgba(239,68,68,0.45); border-radius:24px; padding:48px; text-align:center;">
+                <div style="color:#f87171; font-weight:800;">Could not load courses from the database.</div>
+                <div style="margin-top:0.5rem; color:#94a3b8;">${escapeHtml(error.message || 'Please make sure the backend is running and you are logged in.')}</div>
+            </div>
+        `);
+    }
+}
+
+async function saveSemesterGrades(modal) {
+    const selects = Array.from(modal.querySelectorAll('.semester-grade-select'));
+    const saveBtn = modal.querySelector('.btn');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    }
+
+    try {
+        for (const select of selects) {
+            const courseId = select.dataset.courseId;
+            const grade = select.value;
+            const numericId = parseInt(courseId);
+            if (isNaN(numericId)) continue;
+
+            if (grade) {
+                await apiFetch(`/planning/enroll/${numericId}?status=completed&grade=${encodeURIComponent(grade)}`, {
+                    method: 'PUT'
+                });
+                courseGrades[courseId] = grade;
+            } else {
+                await apiFetch(`/planning/enroll/${numericId}?status=planned&grade=`, {
+                    method: 'PUT'
+                });
+                delete courseGrades[courseId];
+            }
+        }
+
+        saveGrades();
+        modal.remove();
+        await loadStudyPlan();
+        showNotification('Grades saved and GPA updated', 'success');
+    } catch (e) {
+        console.error('Error saving semester grades:', e);
+        showNotification('Failed to save one or more grades', 'error');
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Grades';
+        }
+    }
+}
+
+async function setGrade(courseId, grade) {
+    try {
+        // Handle numeric IDs (from DB) vs string IDs (from custom)
+        const numericId = parseInt(courseId);
+        if (!isNaN(numericId)) {
+            await apiFetch(`/planning/enroll/${numericId}?status=completed&grade=${encodeURIComponent(grade)}`, {
+                method: 'PUT'
+            });
+        }
         
-        const gradeBadge = document.createElement('span');
-        gradeBadge.className = 'grade-badge';
-        gradeBadge.style.cssText = `
-            background: ${getGradeColor(grade)};
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-left: 8px;
-        `;
-        gradeBadge.textContent = grade;
+        courseGrades[courseId] = grade;
+        saveGrades();
+        updateGPADisplay();
+        updateSemesterGPADisplays();
+        addFinalGPADisplay();
         
-        const nameSpan = courseRow.querySelector('.course-name');
-        nameSpan.appendChild(gradeBadge);
+        const courseRow = document.querySelector(`[data-course-id="${courseId}"]`) || 
+                          document.querySelector(`[data-subject-id="${courseId}"]`);
+        
+        if (courseRow) {
+            const existingBadge = courseRow.querySelector('.grade-badge');
+            if (existingBadge) existingBadge.remove();
+            
+            const gradeBadge = document.createElement('span');
+            gradeBadge.className = 'grade-badge';
+            gradeBadge.style.cssText = `
+                background: ${getGradeColor(grade)};
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                margin-left: 8px;
+            `;
+            gradeBadge.textContent = grade;
+            
+            const nameSpan = courseRow.querySelector('.course-name');
+            if (nameSpan) nameSpan.appendChild(gradeBadge);
+            
+            // Mark as completed visually if it wasn't
+            courseRow.classList.add('completed');
+        }
+
+        try {
+            const data = await apiFetch('/planning/career-path/me');
+            hydrateCourseGradesFromSemesters(data.semesters || []);
+            updatePlanningHeaderStats(data);
+            updateGPADisplay();
+            updateSemesterGPADisplays();
+            addFinalGPADisplay();
+        } catch (statsError) {
+            console.warn('Could not refresh planning header stats:', statsError);
+        }
+        
+        showNotification(`Grade ${grade} set successfully`, 'success');
+    } catch (e) {
+        console.error('Error setting grade:', e);
+        showNotification('Failed to save grade to database', 'error');
     }
     
     document.querySelector('.grade-modal')?.remove();
 }
 
-function clearGrade(courseId) {
+async function clearGrade(courseId) {
+    const numericId = parseInt(courseId);
+    if (!isNaN(numericId)) {
+        try {
+            await apiFetch(`/planning/enroll/${numericId}?status=planned&grade=`, {
+                method: 'PUT'
+            });
+        } catch (e) {
+            console.error('Error clearing grade:', e);
+            showNotification('Failed to clear grade in database', 'error');
+            return;
+        }
+    }
+
     delete courseGrades[courseId];
     saveGrades();
     updateGPADisplay();
+    updateSemesterGPADisplays();
+    addFinalGPADisplay();
     
     const courseRow = document.querySelector(`[data-course-id="${courseId}"]`);
     if (courseRow) {
@@ -2816,6 +3451,7 @@ const TOTAL_REQUIRED_CREDITS = 128;
 
 function initPlanning() {
     loadPlanningData();
+    loadStudyPlan(); // New: Load from database
     updatePlanningDate();
     loadTakenSubjects();
     initializePlanningInteractive();
@@ -2827,18 +3463,25 @@ function initPlanning() {
     setTimeout(updateSemesterGPADisplays, 500);
 }
 
-function loadTakenSubjects() {
-    const saved = localStorage.getItem('edumate_taken_subjects');
-    if (saved) {
-        takenSubjects = new Set(JSON.parse(saved));
+async function loadTakenSubjects() {
+    try {
+        const overview = await apiFetch('/planning/overview/me');
+        if (overview && overview.enrollments) {
+            takenSubjects = new Set(
+                overview.enrollments
+                    .filter(e => e.status === 'completed')
+                    .map(e => e.course_id.toString())
+            );
+        }
+    } catch (e) {
+        console.error('Error loading taken subjects:', e);
+        // Fallback to localStorage if backend fails
+        const saved = localStorage.getItem('edumate_taken_subjects');
+        if (saved) {
+            takenSubjects = new Set(JSON.parse(saved));
+        }
     }
     
-    document.querySelectorAll('.course-row[data-subject-id]').forEach(row => {
-        const subjectId = row.getAttribute('data-subject-id');
-        if (subjectId && !subjectId.startsWith('custom_')) {
-            takenSubjects.add(subjectId);
-        }
-    });
     saveTakenSubjects();
 }
 
@@ -2861,7 +3504,7 @@ function initializePlanningInteractive() {
     const addSemesterBtn = document.getElementById('add-semester-btn');
     
     if (careerTag && careerBadge) {
-        createPathSwitch(careerTag, careerBadge);
+        // createPathSwitch(careerTag, careerBadge);
     }
     
     if (addSemesterBtn) {
@@ -2968,7 +3611,8 @@ function createPathSwitch(careerTag, careerBadge) {
         planBtn.style.color = '#1e293b';
         previewBtn.style.background = 'transparent';
         previewBtn.style.color = 'white';
-        careerBadge.innerHTML = '🛡️ Cyber Security';
+        const careerPathName = document.getElementById('career-name-display')?.textContent || 'My Path';
+        careerBadge.innerHTML = `🛡️ ${careerPathName}`;
         switchPlanningView('plan');
     });
     
@@ -3089,16 +3733,121 @@ function closeSubjectModal() {
 
 function showAddSubjectModal(button) {
     planningCurrentSemester = button.closest('.semester-item');
-    document.getElementById('add-subject-modal').style.display = 'flex';
+    const modal = document.getElementById('add-subject-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    // Reset form
+    const idInput = document.getElementById('new-subject-id');
+    const searchInput = document.getElementById('add-subject-search');
+    const statusSel = document.getElementById('new-subject-status');
+    const gradeSel = document.getElementById('new-subject-grade');
+    const gradeGroup = document.getElementById('grade-input-group');
+    const selectedDisplay = document.getElementById('selected-course-display');
+    const selectedName = document.getElementById('selected-course-name');
+
+    if (idInput) idInput.value = '';
+    if (searchInput) searchInput.value = '';
+    if (statusSel) statusSel.value = 'planned';
+    if (gradeSel) gradeSel.value = '';
+    if (gradeGroup) gradeGroup.style.display = 'none';
+    if (selectedDisplay) selectedDisplay.style.display = 'none';
+    if (selectedName) selectedName.textContent = '';
+
     loadAvailableSubjectsForAdd();
 }
 
 function closeAddSubjectModal() {
-    document.getElementById('add-subject-modal').style.display = 'none';
+    const modal = document.getElementById('add-subject-modal');
+    if (modal) modal.style.display = 'none';
     planningCurrentSemester = null;
 }
 
-function loadSubjectsForSemester() {
+function toggleGradeInput(status) {
+    const group = document.getElementById('grade-input-group');
+    if (group) group.style.display = (status === 'completed') ? 'block' : 'none';
+}
+
+// All available courses cached for search filtering
+let _addSubjectAllCourses = [];
+
+async function loadAvailableSubjectsForAdd() {
+    const listEl = document.getElementById('add-subjects-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Loading courses...</div>';
+
+    try {
+        const courses = await apiFetch('/planning/courses');
+        _addSubjectAllCourses = courses || [];
+        renderAddSubjectList(_addSubjectAllCourses);
+    } catch (e) {
+        console.error('Error loading courses:', e);
+        listEl.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">Failed to load courses from database.</div>';
+    }
+}
+
+function renderAddSubjectList(courses) {
+    const listEl = document.getElementById('add-subjects-list');
+    if (!listEl) return;
+
+    if (!courses || courses.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">No courses found.</div>';
+        return;
+    }
+
+    listEl.innerHTML = courses.map(c => `
+        <div onclick="quickAddSubject('${c.id}', '${c.name.replace(/'/g, "'").replace(/"/g, '&quot;')}', ${c.credits}, '${c.code}')"
+             style="display:flex; align-items:center; justify-content:space-between;
+                    padding:9px 12px; border-radius:8px; cursor:pointer; transition:background 0.15s;"
+             onmouseover="this.style.background='rgba(139,92,246,0.12)'"
+             onmouseout="this.style.background='transparent'">
+            <div>
+                <strong style="color:var(--primary);">${c.code}</strong>
+                <span style="color:var(--text); margin-left:8px;">${c.name}</span>
+            </div>
+            <span style="color:var(--muted); font-size:0.8rem; white-space:nowrap; margin-left:12px;">${c.credits} cr</span>
+        </div>
+    `).join('');
+}
+
+function filterAddSubjectList(query) {
+    const q = (query || '').toLowerCase().trim();
+    if (!q) {
+        renderAddSubjectList(_addSubjectAllCourses);
+        return;
+    }
+    const filtered = _addSubjectAllCourses.filter(c =>
+        c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    );
+    renderAddSubjectList(filtered);
+}
+
+function quickAddSubject(id, name, credits, code) {
+    // Set hidden id field
+    const idInput = document.getElementById('new-subject-id');
+    if (idInput) idInput.value = id;
+
+    // Show selected course name
+    const display = document.getElementById('selected-course-display');
+    const nameEl = document.getElementById('selected-course-name');
+    if (display) display.style.display = 'block';
+    if (nameEl) nameEl.textContent = `${code}: ${name} (${credits} cr)`;
+
+    // Highlight chosen row
+    document.querySelectorAll('#add-subjects-list div[onclick]').forEach(el => {
+        el.style.background = 'transparent';
+    });
+    // Find the clicked row by matching id in onclick attribute
+    const rows = document.querySelectorAll('#add-subjects-list div[onclick]');
+    rows.forEach(el => {
+        if (el.getAttribute('onclick').startsWith(`quickAddSubject('${id}'`)) {
+            el.style.background = 'rgba(139,92,246,0.18)';
+        }
+    });
+}
+
+async function loadSubjectsForSemester() {
     const semesterType = document.getElementById('semester-type').value;
     const subjectsList = document.getElementById('subjects-list');
     const customInput = document.getElementById('custom-subject-input');
@@ -3110,111 +3859,154 @@ function loadSubjectsForSemester() {
         updateSelectedSubjectsDisplay();
     } else {
         customInput.style.display = 'none';
-        const subjects = subjectDatabase[semesterType] || [];
-        const availableSubjects = subjects.filter(s => !takenSubjects.has(s.id));
+        subjectsList.innerHTML = '<p style="text-align:center;padding:20px;">Loading subjects...</p>';
         
-        if (availableSubjects.length === 0) {
-            subjectsList.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">All subjects in this category have been taken!</p>';
-            return;
-        }
-        
-        subjectsList.innerHTML = availableSubjects.map(subject => `
-            <div class="subject-item">
-                <input type="checkbox" 
-                       value="${subject.id}"
-                       data-id="${subject.id}"
-                       data-name="${subject.name}"
-                       data-credits="${subject.credits}"
-                       data-code="${subject.code}"
-                       ${subject.required ? 'checked disabled' : ''}
-                       onchange="toggleSubject('${subject.id}', '${subject.name}', ${subject.credits}, '${subject.code}', this.checked)">
-                <div style="flex: 1;">
-                    <strong>${subject.code}: ${subject.name}</strong>
-                    <span style="color: #64748b; margin-left: 10px;">${subject.credits} cr</span>
-                    <span style="color: #2563eb; margin-left: 10px; font-size: 0.85rem;">${subject.department}</span>
-                    ${subject.required ? '<span class="required-badge">Required</span>' : ''}
-                </div>
-            </div>
-        `).join('');
-        
-        subjects.filter(s => s.required && !takenSubjects.has(s.id)).forEach(s => {
-            if (!planningSelectedSubjects.find(sub => sub.id === s.id)) {
-                planningSelectedSubjects.push({ 
-                    id: s.id, 
-                    name: s.name, 
-                    credits: s.credits,
-                    code: s.code 
-                });
+        try {
+            let subjects = [];
+            if (semesterType === 'all') {
+                subjects = await apiFetch('/planning/courses');
+            } else {
+                subjects = subjectDatabase[semesterType] || [];
             }
-        });
-        updateSelectedSubjectsDisplay();
-    }
-}
-
-function loadAvailableSubjectsForAdd() {
-    let listElement = document.getElementById('add-subjects-list');
-    if (!listElement) {
-        const modalBody = document.querySelector('#add-subject-modal .modal-body');
-        listElement = document.createElement('div');
-        listElement.id = 'add-subjects-list';
-        listElement.className = 'subjects-list';
-        listElement.style.marginBottom = '20px';
-        listElement.style.maxHeight = '200px';
-        listElement.style.overflowY = 'auto';
-        modalBody.insertBefore(listElement, document.querySelector('#new-subject-name').closest('.form-group'));
-    }
-    
-    const allSubjects = [];
-    Object.values(subjectDatabase).forEach(category => {
-        category.forEach(subject => {
-            if (!takenSubjects.has(subject.id)) {
-                allSubjects.push(subject);
+            
+            // Filter out subjects already taken
+            const availableSubjects = subjects.filter(s => !takenSubjects.has(s.id.toString()));
+            
+            if (availableSubjects.length === 0) {
+                subjectsList.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">All subjects in this category have been taken!</p>';
+                return;
             }
-        });
-    });
-    
-    if (allSubjects.length === 0) {
-        listElement.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 10px;">No available subjects! All subjects have been taken.</p>';
-        return;
-    }
-    
-    listElement.innerHTML = `
-        <p style="margin-bottom: 10px; font-weight: 600;">Quick Add from Database:</p>
-        ${allSubjects.map(subject => `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #e2e8f0;">
-                <div>
-                    <strong>${subject.code}</strong> - ${subject.name}
-                    <span style="color: #64748b; margin-left: 10px;">${subject.credits} cr</span>
+            
+            subjectsList.innerHTML = availableSubjects.map(subject => `
+                <div class="subject-item">
+                    <input type="checkbox" 
+                           value="${subject.id}"
+                           data-id="${subject.id}"
+                           data-name="${subject.name}"
+                           data-credits="${subject.credits}"
+                           data-code="${subject.code}"
+                           ${subject.required ? 'checked disabled' : ''}
+                           onchange="toggleSubject('${subject.id}', '${subject.name}', ${subject.credits}, '${subject.code}', this.checked)">
+                    <div style="flex: 1;">
+                        <strong>${subject.code}: ${subject.name}</strong>
+                        <span style="color: #64748b; margin-left: 10px;">${subject.credits} cr</span>
+                        <span style="color: #2563eb; margin-left: 10px; font-size: 0.85rem;">${subject.department || ''}</span>
+                        ${subject.required ? '<span class="required-badge">Required</span>' : ''}
+                    </div>
                 </div>
-                <button onclick="quickAddSubject('${subject.id}', '${subject.name}', ${subject.credits}, '${subject.code}')" 
-                        class="link-btn" 
-                        style="padding: 4px 12px; font-size: 0.85rem;">
-                    Add
-                </button>
-            </div>
-        `).join('')}
-    `;
-}
-
-function quickAddSubject(id, name, credits, code) {
-    document.getElementById('new-subject-name').value = name;
-    document.getElementById('new-subject-credits').value = credits;
-}
-
-function toggleSubject(id, name, credits, code, isChecked) {
-    if (isChecked) {
-        if (!planningSelectedSubjects.find(s => s.id === id)) {
-            planningSelectedSubjects.push({ id, name, credits, code });
+            `).join('');
+            
+            // Auto-select required subjects if any
+            availableSubjects.filter(s => s.required).forEach(s => {
+                if (!planningSelectedSubjects.find(sub => sub.id === s.id.toString())) {
+                    planningSelectedSubjects.push({ 
+                        id: s.id.toString(), 
+                        name: s.name, 
+                        credits: s.credits,
+                        code: s.code 
+                    });
+                }
+            });
+            updateSelectedSubjectsDisplay();
+        } catch (e) {
+            console.error('Error loading subjects:', e);
+            subjectsList.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">Failed to load subjects.</p>';
         }
-    } else {
-        planningSelectedSubjects = planningSelectedSubjects.filter(s => s.id !== id);
+    }
+}
+
+function toggleSubject(id, name, credits, code, checked) {
+    const subjectId = String(id);
+    planningSelectedSubjects = planningSelectedSubjects.filter(subject => String(subject.id) !== subjectId);
+    if (checked) {
+        planningSelectedSubjects.push({
+            id: subjectId,
+            name,
+            credits: Number(credits) || 0,
+            code
+        });
     }
     updateSelectedSubjectsDisplay();
+}
+
+
+async function addSubjectToSemester() {
+    const subjectIdInput = document.getElementById('new-subject-id');
+    const subjectId = subjectIdInput ? subjectIdInput.value.trim() : '';
+    const status = document.getElementById('new-subject-status')?.value || 'planned';
+    const grade = document.getElementById('new-subject-grade')?.value || null;
+
+    // Get name from selected course display for feedback
+    const selectedNameEl = document.getElementById('selected-course-name');
+    const subjectName = selectedNameEl ? selectedNameEl.textContent : 'Course';
+
+    if (!subjectId || isNaN(parseInt(subjectId))) {
+        showNotification('⚠️ Please select a course from the list first.', 'warning');
+        return;
+    }
+
+    if (!planningCurrentSemester) {
+        showNotification('⚠️ No semester selected. Please open this modal from a semester card.', 'warning');
+        return;
+    }
+
+    // Derive semester to save — use data-semester-name if available (e.g. "Fall", "Spring")
+    let semesterToSave;
+    const semSeason = planningCurrentSemester.dataset.semesterName || planningCurrentSemester.dataset.semesterSeason;
+    if (semSeason) {
+        semesterToSave = semSeason; // e.g. "Fall", "Spring"
+    } else {
+        const semesterTitle = planningCurrentSemester.querySelector('h3')?.textContent?.trim() || 'Fall';
+        semesterToSave = semesterTitle;
+        if (semesterTitle.includes(' - ')) {
+            semesterToSave = semesterTitle.split(' - ').pop().trim();
+        } else if (/^sem\s+\d+$/i.test(semesterTitle)) {
+            semesterToSave = semesterTitle.replace(/^sem\s+/i, 'Semester ');
+        }
+    }
+
+    const btn = document.getElementById('add-subject-submit-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
+
+    try {
+        await apiFetch('/planning/me/courses', {
+            method: 'POST',
+            body: JSON.stringify({
+                course_id: parseInt(subjectId),
+                semester: semesterToSave,
+                status: status,
+                grade: (status === 'completed' && grade) ? grade : null
+            })
+        });
+
+        showNotification(`✅ "${subjectName}" added successfully!`, 'success');
+        closeAddSubjectModal();
+
+        // Refresh views that show the student's courses
+        try { await loadStudyPlan(); } catch(e) {}
+        try { await loadAcademicPlan(); } catch(e) {}
+        try { await loadCareerTimeline(); } catch(e) {}
+        // Refresh header stats independently
+        try {
+            const stats = await apiFetch('/planning/career-path/me');
+            updatePlanningHeaderStats(stats);
+        } catch(e) {}
+
+    } catch (e) {
+        console.error('Error adding subject to DB:', e);
+        const msg = (e.message && e.message.includes('already')) 
+            ? 'This course is already in your plan for this semester.'
+            : (e.message || 'Failed to add subject. Please try again.');
+        showNotification('❌ ' + msg, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus-circle"></i> Add Subject'; }
+    }
 }
 
 function updateSelectedSubjectsDisplay() {
     const listElement = document.getElementById('selected-subjects-list');
     const countElement = document.getElementById('selected-count');
+    if (!listElement || !countElement) return;
     
     countElement.textContent = planningSelectedSubjects.length;
     
@@ -3232,9 +4024,9 @@ function updateSelectedSubjectsDisplay() {
     }
 }
 
-function createSemesterWithSubjects() {
-    const semesterType = document.getElementById('semester-type');
-    const selectedType = semesterType.options[semesterType.selectedIndex].text;
+async function createSemesterWithSubjects() {
+    const semesterTypeEl = document.getElementById('semester-type');
+    const selectedType = semesterTypeEl.options[semesterTypeEl.selectedIndex].text;
     const semesterCardsContainer = document.getElementById('semester-cards-container');
     const currentSemesters = document.querySelectorAll('.semester-item');
     const nextSemNum = currentSemesters.length + 1;
@@ -3261,12 +4053,29 @@ function createSemesterWithSubjects() {
         return;
     }
     
-    const alreadyTaken = planningSelectedSubjects.filter(s => takenSubjects.has(s.id));
-    if (alreadyTaken.length > 0) {
-        alert(`The following subjects have already been taken:\n${alreadyTaken.map(s => s.name).join('\n')}`);
-        return;
+    // Save to database
+    try {
+        const enrollData = planningSelectedSubjects
+            .filter(s => !s.id.toString().startsWith('custom_'))
+            .map(s => ({
+                course_id: parseInt(s.id),
+                semester: selectedType,
+                status: 'planned'
+            }));
+            
+        if (enrollData.length > 0) {
+            await apiFetch('/planning/enroll', {
+                method: 'POST',
+                body: JSON.stringify(enrollData)
+            });
+        }
+        
+        showNotification(`Semester saved to database`, 'success');
+    } catch (e) {
+        console.error('Error saving semester:', e);
+        showNotification('Failed to save some courses to database', 'warning');
     }
-    
+
     const totalCredits = planningSelectedSubjects.reduce((sum, subject) => sum + subject.credits, 0);
     
     const newSemester = document.createElement('div');
@@ -3277,18 +4086,18 @@ function createSemesterWithSubjects() {
     newSemester.style.transition = 'all 0.3s ease';
     
     const coursesHTML = planningSelectedSubjects.map(subject => {
-        const courseId = `db_${subject.id}`;
-        takenSubjects.add(subject.id);
+        const courseId = subject.id;
+        takenSubjects.add(subject.id.toString());
         
         return `
-            <div class="course-row" data-course-id="${courseId}" data-subject-id="${subject.id}">
+            <div class="course-row" data-course-id="${courseId}" data-subject-id="${courseId}">
                 <span class="course-name">
                     <i class="fas fa-circle"></i> 
                     <span class="course-code">${subject.code}:</span> ${subject.name}
                 </span>
                 <span class="course-credits" data-credits="${subject.credits}">${subject.credits} cr</span>
                 <div class="course-actions">
-                    <button class="delete-course-btn" onclick="deleteCourse(this, '${subject.id}')">
+                    <button class="delete-course-btn" onclick="deleteCourse(this, '${courseId}')">
                         <i class="fas fa-times-circle"></i>
                     </button>
                 </div>
@@ -3328,7 +4137,9 @@ function createSemesterWithSubjects() {
     updateSemesterCounter();
     calculateAllCredits();
     closeSubjectModal();
-    showNotification(`Semester ${nextSemNum} created with ${planningSelectedSubjects.length} subjects`, 'success');
+    
+    updatePlanningHeaderStats();
+    loadCareerTimeline(); // Refresh path view
     
     setTimeout(addGradeButtons, 500);
     updateGPADisplay();
@@ -3336,72 +4147,29 @@ function createSemesterWithSubjects() {
     addFinalGPADisplay();
 }
 
-function addSubjectToSemester() {
-    if (!planningCurrentSemester) return;
-    
-    const subjectName = document.getElementById('new-subject-name').value.trim();
-    const credits = document.getElementById('new-subject-credits').value;
-    const subjectId = 'custom_' + Date.now();
-    const subjectCode = 'CUSTOM';
-    
-    if (!subjectName) {
-        alert('Please enter a subject name');
-        return;
-    }
-    
-    const coursesContainer = planningCurrentSemester.querySelector('.courses-container');
-    const courseId = `db_${subjectId}`;
-    
-    takenSubjects.add(subjectId);
-    saveTakenSubjects();
-    
-    const newCourseRow = document.createElement('div');
-    newCourseRow.className = 'course-row';
-    newCourseRow.setAttribute('data-course-id', courseId);
-    newCourseRow.setAttribute('data-subject-id', subjectId);
-    newCourseRow.innerHTML = `
-        <span class="course-name">
-            <i class="fas fa-circle"></i> 
-            <span class="course-code">${subjectCode}:</span> ${subjectName}
-        </span>
-        <span class="course-credits" data-credits="${credits}">${credits} cr</span>
-        <div class="course-actions">
-            <button class="delete-course-btn" onclick="deleteCourse(this, '${subjectId}')">
-                <i class="fas fa-times-circle"></i>
-            </button>
-        </div>
-    `;
-    
-    newCourseRow.style.opacity = '0';
-    newCourseRow.style.transform = 'translateX(-10px)';
-    newCourseRow.style.transition = 'all 0.3s ease';
-    
-    coursesContainer.appendChild(newCourseRow);
-    
-    setTimeout(() => {
-        newCourseRow.style.opacity = '1';
-        newCourseRow.style.transform = 'translateX(0)';
-    }, 10);
-    
-    updateSemesterCredits(planningCurrentSemester);
-    closeAddSubjectModal();
-    showNotification(`Added "${subjectName}" to semester`, 'success');
-    
-    setTimeout(addGradeButtons, 500);
-    updateGPADisplay();
-    updateSemesterGPADisplays();
-    addFinalGPADisplay();
-}
-
-function deleteCourse(button, subjectId) {
+async function deleteCourse(button, subjectId) {
     const courseRow = button.closest('.course-row');
     const semesterItem = courseRow.closest('.semester-item');
     const subjectName = courseRow.querySelector('.course-name').textContent.trim();
     
     if (!confirm(`Are you sure you want to delete "${subjectName}"?`)) return;
     
-    if (subjectId && !subjectId.startsWith('custom_')) {
-        takenSubjects.delete(subjectId);
+    const numericId = parseInt(subjectId);
+    if (!isNaN(numericId)) {
+        try {
+            await apiFetch(`/planning/enroll/${numericId}`, {
+                method: 'DELETE'
+            });
+            showNotification(`"${subjectName}" removed from database`, 'info');
+        } catch (e) {
+            console.error('Error deleting subject from DB:', e);
+            showNotification('Failed to remove from database', 'error');
+            return;
+        }
+    }
+    
+    if (subjectId && !subjectId.toString().startsWith('custom_')) {
+        takenSubjects.delete(subjectId.toString());
         saveTakenSubjects();
     }
     
@@ -3411,10 +4179,11 @@ function deleteCourse(button, subjectId) {
     setTimeout(() => {
         courseRow.remove();
         updateSemesterCredits(semesterItem);
-        showNotification(`Removed "${subjectName}" from semester`, 'info');
         updateGPADisplay();
         updateSemesterGPADisplays();
         addFinalGPADisplay();
+        updatePlanningHeaderStats();
+        loadCareerTimeline();
     }, 300);
 }
 
@@ -3592,8 +4361,41 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
+async function updatePlanningHeaderStats() {
+    try {
+        const overview = await apiFetch('/planning/overview/me');
+        if (!overview) return;
+
+        const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+        
+        el('total-credits', overview.total_credits);
+        el('earned-credits', overview.completed_credits);
+        el('remaining-credits', overview.remaining_credits);
+        el('current-gpa', overview.current_gpa.toFixed(2));
+        
+        const progressBar = document.getElementById('progress-bar');
+        if (progressBar) {
+            progressBar.style.width = `${overview.progress_percentage}%`;
+        }
+        const percentText = document.getElementById('progress-percentage');
+        if (percentText) {
+            percentText.textContent = `${overview.progress_percentage}%`;
+        }
+
+        // Update other labels if they exist
+        el('path-progress-percent', `${overview.progress_percentage}%`);
+        el('preview-progress-text', `${overview.progress_percentage}% Complete`);
+        
+    } catch (e) {
+        console.error('Error updating planning stats:', e);
+    }
+}
+
 async function loadPlanningData() {
     console.log('Loading planning data UI...');
+    // Fetch and update header stats first
+    await updatePlanningHeaderStats();
+    
     // Render the UI components
     loadCareerTimeline();
     loadSummerCourses();
@@ -3733,6 +4535,7 @@ function refreshDashboard() {
     }
     
     loadDashboardStats();
+    updatePlanningHeaderStats();
     
     setTimeout(() => {
         if (refreshBtn) {
@@ -3743,6 +4546,9 @@ function refreshDashboard() {
     }, 1000);
 }
 
+let _curriculumData = null;
+let _curriculumMajor = 'Computer Science';
+
 function initCoursesPage() {
     const searchInput = document.getElementById('course-search-input');
     if (searchInput) {
@@ -3750,9 +4556,208 @@ function initCoursesPage() {
             if (e.key === 'Enter') searchCourses();
         });
     }
-    
     currentPage = 1;
     currentSearchResults = [];
+}
+
+async function loadCurriculumMap() {
+    const grid = document.getElementById('curriculum-grid');
+    if (!grid) return;
+    if (_curriculumData) {
+        renderCurriculumGrid(_curriculumData, _curriculumMajor);
+        return;
+    }
+    try {
+        const data = await apiFetch('/courses/curriculum-map', { auth: false });
+        _curriculumData = data;
+        renderCurriculumGrid(data, _curriculumMajor);
+    } catch (e) {
+        grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Could not load curriculum data.</div>';
+    }
+}
+
+function switchCurriculumMajor(majorName) {
+    _curriculumMajor = majorName;
+    const labelMap = { 'Computer Science': 'CS', 'Cyber Security': 'Cyber', 'Data Science': 'DS' };
+    const label = labelMap[majorName] || majorName;
+    const btns = document.querySelectorAll('.curriculum-toggle-btn');
+    btns.forEach(b => {
+        b.classList.toggle('active', b.textContent.trim().includes(label));
+    });
+    if (_curriculumData) renderCurriculumGrid(_curriculumData, majorName);
+}
+
+function getCourseCategory(code) {
+    if (!code) return 'cs';
+    const prefix = code.replace(/[0-9]/g, '').toUpperCase();
+    if (prefix === 'CY') return 'cy';
+    if (prefix === 'DS') return 'ds';
+    if (prefix === 'BIS') return 'bis';
+    return 'cs';
+}
+
+let _curriculumFlatMap = {};
+let _selectedCourseCode = null;
+
+function buildCurriculumGraph(semesters) {
+    _curriculumFlatMap = {};
+    for (let i = 1; i <= 8; i++) {
+        const courses = semesters[String(i)] || [];
+        for (const c of courses) {
+            _curriculumFlatMap[c.code] = c;
+        }
+    }
+}
+
+function handleCourseCardClick(clickedCode) {
+    if (_selectedCourseCode === clickedCode) {
+        _selectedCourseCode = null;
+        updateCurriculumGridColors(null, new Set(), new Set(), new Set());
+        return;
+    }
+    
+    _selectedCourseCode = clickedCode;
+    
+    const directPrereqs = new Set();
+    const indirectPrereqs = new Set();
+    const nextCourses = new Set();
+    
+    function findPrereqs(code, isDirect) {
+        const course = _curriculumFlatMap[code];
+        if (!course || !course.prerequisites) return;
+        
+        for (const prereqCode of course.prerequisites) {
+            if (isDirect) {
+                directPrereqs.add(prereqCode);
+                findPrereqs(prereqCode, false);
+            } else {
+                if (!directPrereqs.has(prereqCode)) {
+                    indirectPrereqs.add(prereqCode);
+                }
+                findPrereqs(prereqCode, false);
+            }
+        }
+    }
+    
+    findPrereqs(clickedCode, true);
+    
+    for (const code in _curriculumFlatMap) {
+        if (code === clickedCode) continue;
+        const c = _curriculumFlatMap[code];
+        if (c.prerequisites && c.prerequisites.includes(clickedCode)) {
+            nextCourses.add(code);
+        }
+    }
+    
+    updateCurriculumGridColors(clickedCode, directPrereqs, indirectPrereqs, nextCourses);
+}
+
+window.handleCourseCardClick = handleCourseCardClick;
+
+function updateCurriculumGridColors(selectedCode, directPrereqs, indirectPrereqs, nextCourses) {
+    const cells = document.querySelectorAll('#curriculum-grid .cur-table-cell');
+    
+    cells.forEach(cell => {
+        cell.classList.remove('selected-course', 'direct-prereq', 'indirect-prereq', 'next-course', 'dimmed');
+        
+        const codeText = cell.getAttribute('data-course-code');
+        if (!codeText) return;
+        
+        if (!selectedCode) {
+            return;
+        }
+        
+        if (codeText === selectedCode) {
+            cell.classList.add('selected-course');
+        } else if (directPrereqs.has(codeText)) {
+            cell.classList.add('direct-prereq');
+        } else if (indirectPrereqs.has(codeText)) {
+            cell.classList.add('indirect-prereq');
+        } else if (nextCourses.has(codeText)) {
+            cell.classList.add('next-course');
+        } else {
+            cell.classList.add('dimmed');
+        }
+    });
+}
+
+function renderCurriculumGrid(data, majorName) {
+    const grid = document.getElementById('curriculum-grid');
+    if (!grid) return;
+    const semesters = data[majorName] || {};
+
+    // Build flat map for relationship calculations
+    buildCurriculumGraph(semesters);
+
+    // Reset selected code when major changes
+    _selectedCourseCode = null;
+
+    // Find the max number of courses in any semester for column count
+    let maxCols = 0;
+    for (let i = 1; i <= 8; i++) {
+        const courses = semesters[String(i)] || [];
+        if (courses.length > maxCols) maxCols = courses.length;
+    }
+    if (maxCols < 4) maxCols = 4; // minimum 4 columns
+
+    let html = '<table class="cur-table" style="width: 100%; border-collapse: separate; border-spacing: 0 8px;"><tbody>';
+    
+    const yearNames = ['First Year', 'Second Year', 'Third Year', 'Fourth Year'];
+    
+    for (let year = 1; year <= 4; year++) {
+        // Add a stylized Year Header Row
+        html += `<tr class="cur-table-year-row">
+            <td colspan="${maxCols + 1}" style="padding: 18px 20px 10px 20px; font-weight: 800; color: var(--primary); text-align: left; font-size: 1.15rem; letter-spacing: 1px; text-transform: uppercase;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-graduation-cap" style="color: var(--accent);"></i>
+                    ${yearNames[year - 1]}
+                    <div style="flex-grow: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, transparent 100%); margin-left: 15px;"></div>
+                </div>
+            </td>
+        </tr>`;
+        
+        for (let semInYear = 1; semInYear <= 2; semInYear++) {
+            let i = (year - 1) * 2 + semInYear;
+            let semSeason = semInYear === 1 ? 'Fall' : 'Spring';
+            
+            const courses = semesters[String(i)] || [];
+            html += '<tr class="cur-table-row">';
+            html += `<td class="cur-table-sem" style="vertical-align: middle; background: rgba(255,255,255,0.02); border-left: 3px solid var(--accent); border-radius: 8px 0 0 8px;">
+                <span style="display:block; font-size:1.05rem; font-weight:700;">Semester ${i}</span>
+                <span style="display:inline-block; font-size:0.75rem; color:#94a3b8; font-weight:600; margin-top:6px; background: rgba(0,0,0,0.3); padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px;">${semSeason}</span>
+            </td>`;
+            
+            for (let j = 0; j < maxCols; j++) {
+                if (j < courses.length) {
+                    const c = courses[j];
+                    const cat = getCourseCategory(c.code);
+                    
+                    // Dynamically detect Summer courses and assign distinct styling
+                    const isSummer = c.semester_name === 'Summer';
+                    const summerBadge = isSummer 
+                        ? `<div style="font-size: 0.7rem; color: #f59e0b; font-weight: 700; margin-bottom: 6px; display: inline-block; background: rgba(245,158,11,0.15); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">☀️ Summer</div>` 
+                        : '';
+                    const summerStyle = isSummer 
+                        ? 'style="border: 1px solid rgba(245,158,11,0.6); box-shadow: inset 0 0 15px rgba(245,158,11,0.05);"' 
+                        : '';
+                    
+                    const prereqText = c.prerequisites && c.prerequisites.length
+                        ? `<div class="cur-cell-prereq">Prereq: ${c.prerequisites.join(', ')}</div>` : '';
+                    html += `<td class="cur-table-cell" data-cat="${cat}" data-course-code="${c.code}" onclick="handleCourseCardClick('${c.code}')" ${summerStyle}>
+                        ${summerBadge}
+                        <div class="cur-cell-name">${c.name}</div>
+                        <div class="cur-cell-code">${c.code} · ${c.credits}CH</div>
+                        ${prereqText}
+                    </td>`;
+                } else {
+                    html += '<td class="cur-table-cell cur-cell-empty"></td>';
+                }
+            }
+            html += '</tr>';
+        }
+    }
+    html += '</tbody></table>';
+    grid.innerHTML = html;
 }
 
 function showModal(content, modalId) {
@@ -3771,7 +4776,7 @@ function closeCourseModal() {
     document.querySelectorAll('.course-modal').forEach(m => m.remove());
 }
 
-const PROTECTED_PAGES = new Set(['dashboard','resume','Internships','xai','profile','courses','planning']);
+const PROTECTED_PAGES = new Set(['dashboard','resume','Internships','xai','profile','courses','planning','advisor-chat','advisor-meetups']);
 
 function navigateTo(id) {
     const logged = sessionStorage.getItem('edumate_logged') === '1';
@@ -3825,6 +4830,20 @@ function runPageInit(id) {
     if (id === 'resume') setTimeout(generateResumePreview, 50);
     if (id === 'courses') setTimeout(initCoursesPage, 50);
     if (id === 'planning') setTimeout(initPlanning, 50);
+    if (id === 'advisor-chat') {
+        setTimeout(() => {
+            if (typeof window.loadStudentAdvisorInfo === 'function') window.loadStudentAdvisorInfo();
+            if (typeof window.loadStudentAdvisorMessages === 'function') window.loadStudentAdvisorMessages();
+            if (typeof window.startStudentChatPolling === 'function') window.startStudentChatPolling();
+        }, 100);
+    } else if (id === 'advisor-meetups') {
+        setTimeout(() => {
+            if (typeof window.stopStudentChatPolling === 'function') window.stopStudentChatPolling();
+            if (typeof window.initializeAdvisorMeetupsPage === 'function') window.initializeAdvisorMeetupsPage();
+        }, 100);
+    } else {
+        if (typeof window.stopStudentChatPolling === 'function') window.stopStudentChatPolling();
+    }
 }
 
 function logActivity(action, text) {
@@ -4053,168 +5072,13 @@ function quickGradeAll(grade) {
     }
 }
 
-// ============================================
-// NEW PLANNING FEATURES - Plan/Preview Toggle, Timeline, Summer Courses, Advisor Chat
-// ============================================
-
-function switchPlanningView(view) {
-    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.planning-view').forEach(v => v.classList.remove('active'));
-    
-    if (view === 'plan') {
-        document.querySelector('.toggle-btn:first-child').classList.add('active');
-        document.getElementById('planning-plan-view').classList.add('active');
-    } else {
-        document.querySelector('.toggle-btn:last-child').classList.add('active');
-        document.getElementById('planning-preview-view').classList.add('active');
-        loadCareerTimeline();
-        loadSummerCourses();
-        loadAdvisorSuggestions();
-    }
-}
-
-async function loadCareerTimeline() {
-    try {
-        const data = await apiFetch('/planning/timeline/me');
-        const timeline = document.getElementById('career-timeline');
-        if (!timeline) return;
-        
-        document.getElementById('preview-career-name').textContent = data.career_path || 'Your Career';
-        
-        timeline.innerHTML = data.semesters.map((s, i) => {
-            const statusClass = (s.status || 'upcoming').replace(' summer', '');
-            const isSummer = (s.status || '').includes('summer');
-            const circleClass = isSummer ? 'summer' : statusClass;
-            return `
-            <div class="timeline-node">
-                <div class="node-circle ${circleClass}">${i + 1}</div>
-                <div class="node-label">
-                    <div class="node-semester">${s.name}</div>
-                    <div class="node-courses">${s.total_credits} credits</div>
-                    <div class="node-status ${statusClass}-status">${statusClass === 'completed' ? '✅ Done' : statusClass === 'current' ? '🔄 Active' : isSummer ? '☀️ Summer' : '📅 Planned'}</div>
-                </div>
-            </div>`;
-        }).join('');
-        
-        const total = data.semesters.reduce((a, s) => a + s.total_credits, 0);
-        const earned = data.semesters.reduce((a, s) => a + s.completed_credits, 0);
-        const done = data.semesters.filter(s => s.status === 'completed').length;
-        
-        document.getElementById('path-summary-row').innerHTML = `
-            <div class="path-summary-card"><h4>📊 Progress</h4><div class="summary-value">${data.total_progress}%</div></div>
-            <div class="path-summary-card"><h4>✅ Earned</h4><div class="summary-value">${earned}</div></div>
-            <div class="path-summary-card"><h4>📅 Remaining</h4><div class="summary-value">${total - earned}</div></div>
-            <div class="path-summary-card"><h4>🎯 Done</h4><div class="summary-value">${done}/${data.semesters.length}</div></div>`;
-    } catch (e) {
-        console.error('Failed to load timeline:', e);
-    }
-}
-
-async function loadSummerCourses() {
-    try {
-        const data = await apiFetch('/planning/summer-courses/me');
-        const container = document.getElementById('summer-course-list');
-        if (!container) return;
-        
-        if (!data.length) {
-            container.innerHTML = '<p style="color:#92400e;font-size:0.9rem;">No summer courses recommended at this time.</p>';
-            return;
-        }
-        
-        container.innerHTML = data.map(c => `
-            <div class="summer-course-item">
-                <div class="summer-course-info">
-                    <span class="summer-course-code">${c.code}</span>
-                    <span class="summer-course-name">${c.name}</span>
-                    <span class="summer-course-credits">(${c.credits} cr)</span>
-                    ${!c.prerequisite_met ? `<span style="color:#ef4444;font-size:0.7rem;">⚠️ Req: ${c.prerequisite?.code || 'N/A'}</span>` : ''}
-                </div>
-                <button class="request-this-btn" onclick="requestSummerCourse(${c.id}, '${c.name}')">📝 Request</button>
-            </div>
-        `).join('');
-    } catch (e) {
-        console.error('Failed to load summer courses:', e);
-    }
-}
-
-async function requestSummerCourse(courseId, courseName) {
-    try {
-        await apiFetch(`/planning/summer-courses/request?course_id=${courseId}`, { method: 'POST' });
-        showNotification(`Request for "${courseName}" submitted!`, 'success');
-        document.querySelectorAll('.request-this-btn').forEach(b => {
-            if (b.textContent.includes('Request')) { b.textContent = '✅ Requested'; b.classList.add('requested'); b.disabled = true; }
-        });
-    } catch (e) {
-        showNotification('Failed to submit request', 'error');
-    }
-}
-
-function viewAllSummerCourses() {
-    switchPlanningView('preview');
-    setTimeout(() => sendAdvisorQuickMessage('Tell me about all available summer courses'), 300);
-}
-
-async function sendAdvisorMessage() {
-    const input = document.getElementById('advisor-chat-input');
-    const container = document.getElementById('advisor-chat-messages');
-    if (!input || !container) return;
-    const msg = input.value.trim();
-    if (!msg) return;
-    
-    input.value = '';
-    appendAdvisorBubble(container, 'user', msg);
-    
-    try {
-        const data = await apiFetch('/planning/advisor/chat', {
-            method: 'POST',
-            body: JSON.stringify({ message: msg, channel: 'planning_advisor' })
-        });
-        appendAdvisorBubble(container, 'ai', data.message);
-        updateAdvisorSuggestions(data.suggestions || []);
-    } catch (e) {
-        appendAdvisorBubble(container, 'ai', 'Sorry, I could not process your request. Please try again.');
-    }
-}
-
-function sendAdvisorQuickMessage(msg) {
-    document.getElementById('advisor-chat-input').value = msg;
-    sendAdvisorMessage();
-}
-
-function appendAdvisorBubble(container, type, text) {
-    const div = document.createElement('div');
-    div.className = `advisor-message ${type}`;
-    div.innerHTML = `
-        <div class="advisor-avatar ${type === 'ai' ? 'ai-avatar' : 'user-avatar'}">${type === 'ai' ? '🤖' : '👤'}</div>
-        <div class="advisor-bubble">${text.replace(/\n/g, '<br>')}</div>`;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-}
-
-function updateAdvisorSuggestions(suggestions) {
-    const container = document.getElementById('advisor-suggestions');
-    if (!container) return;
-    container.innerHTML = suggestions.map(s => 
-        `<span class="suggestion-chip" onclick="sendAdvisorQuickMessage('${s}')">${s}</span>`
-    ).join('');
-}
-
-function loadAdvisorSuggestions() {
-    updateAdvisorSuggestions([
-        'What courses should I take next?',
-        'Are there summer courses?',
-        'Show graduation timeline',
-        'Check my prerequisites'
-    ]);
-}
-
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
     const storedTheme = localStorage.getItem('edumate_theme');
     if (storedTheme === 'dark') document.body.classList.add('dark-theme');
     updateThemeIcon();
     
-    loadCoursesData();
+    initCoursesPage();
     updateSidebarFromStorage();
     applyStoredProfileToUI();
     setupEventListeners();
@@ -4224,42 +5088,841 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================
 // EXPORT FUNCTIONS
 // ============================================
-window.switchPlanningView = switchPlanningView;
-window.sendAdvisorMessage = sendAdvisorMessage;
-window.sendAdvisorQuickMessage = sendAdvisorQuickMessage;
-window.requestSummerCourse = requestSummerCourse;
-window.viewAllSummerCourses = viewAllSummerCourses;
-window.apiFetch = apiFetch;
-window.navigateTo = navigateTo;
-window.initPlanning = initPlanning;
-window.toggleAIPopup = toggleAIPopup;
-window.signOut = signOut;
-window.refreshDashboard = refreshDashboard;
-window.searchCourses = searchCourses;
-window.quickSearch = quickSearch;
-window.loadInternshipsByPosition = loadInternshipsByPosition;
-window.generateResumePreview = generateResumePreview;
-window.downloadResumePDF = downloadResumePDF;
-window.saveResumeData = saveResumeData;
-window.addEducation = addEducation;
-window.addExperience = addExperience;
-window.addProject = addProject;
-window.showResumeForm = showResumeForm;
-window.changeProfileAvatar = changeProfileAvatar;
-window.saveProfileEdits = saveProfileEdits;
-window.attemptLogin = attemptLogin;
-window.firebaseLogin = firebaseLogin;
-window.startRegistration = startRegistration;
-window.completeRegistration = completeRegistration;
-window.showNotification = showNotification;
-window.closeSubjectModal = closeSubjectModal;
-window.closeAddSubjectModal = closeAddSubjectModal;
-window.createSemesterWithSubjects = createSemesterWithSubjects;
-window.showAddSubjectModal = showAddSubjectModal;
-window.addSubjectToSemester = addSubjectToSemester;
-window.deleteCourse = deleteCourse;
-window.toggleGPASection = toggleGPASection;
-window.quickGradeAll = quickGradeAll;
+window.switchPlanningView = window.switchPlanningView || switchPlanningView;
+window.switchCurriculumMajor = window.switchCurriculumMajor || switchCurriculumMajor;
+window.sendAdvisorMessage = window.sendAdvisorMessage || sendAdvisorMessage;
+window.sendAdvisorQuickMessage = window.sendAdvisorQuickMessage || sendAdvisorQuickMessage;
+window.requestSummerCourse = window.requestSummerCourse || requestSummerCourse;
+window.viewAllSummerCourses = window.viewAllSummerCourses || viewAllSummerCourses;
+window.apiFetch = window.apiFetch || apiFetch;
+window.navigateTo = window.navigateTo || navigateTo;
+window.initPlanning = window.initPlanning || initPlanning;
+window.initCoursesPage = window.initCoursesPage || initCoursesPage;
+window.showSummerRequestModal = window.showSummerRequestModal || showSummerRequestModal;
+window.closeSummerRequestModal = window.closeSummerRequestModal || closeSummerRequestModal;
+window.submitSummerRequest = window.submitSummerRequest || submitSummerRequest;
+window.cancelSummerRequest = window.cancelSummerRequest || cancelSummerRequest;
+window.toggleAIPopup = window.toggleAIPopup || toggleAIPopup;
+window.signOut = window.signOut || signOut;
+window.refreshDashboard = window.refreshDashboard || refreshDashboard;
+window.searchCourses = window.searchCourses || searchCourses;
+window.quickSearch = window.quickSearch || quickSearch;
+window.loadInternshipsByPosition = window.loadInternshipsByPosition || loadInternshipsByPosition;
+window.generateResumePreview = window.generateResumePreview || generateResumePreview;
+window.downloadResumePDF = window.downloadResumePDF || downloadResumePDF;
+window.saveResumeData = window.saveResumeData || saveResumeData;
+window.addEducation = window.addEducation || addEducation;
+window.addExperience = window.addExperience || addExperience;
+window.addProject = window.addProject || addProject;
+window.showResumeForm = window.showResumeForm || showResumeForm;
+window.changeProfileAvatar = window.changeProfileAvatar || changeProfileAvatar;
+window.saveProfileEdits = window.saveProfileEdits || saveProfileEdits;
+window.attemptLogin = window.attemptLogin || attemptLogin;
+window.firebaseLogin = window.firebaseLogin || firebaseLogin;
+window.startRegistration = window.startRegistration || startRegistration;
+window.completeRegistration = window.completeRegistration || completeRegistration;
+window.showNotification = window.showNotification || showNotification;
+window.closeSubjectModal = window.closeSubjectModal || closeSubjectModal;
+window.closeAddSubjectModal = window.closeAddSubjectModal || closeAddSubjectModal;
+window.createSemesterWithSubjects = window.createSemesterWithSubjects || createSemesterWithSubjects;
+window.showAddSubjectModal = window.showAddSubjectModal || showAddSubjectModal;
+window.addSubjectToSemester = window.addSubjectToSemester || addSubjectToSemester;
+window.deleteCourse = window.deleteCourse || deleteCourse;
+window.toggleGPASection = window.toggleGPASection || toggleGPASection;
+window.quickGradeAll = window.quickGradeAll || quickGradeAll;
+window.setGrade = window.setGrade || setGrade;
+window.clearGrade = window.clearGrade || clearGrade;
+window.showSemesterGradeModal = window.showSemesterGradeModal || showSemesterGradeModal;
+window.saveSemesterGrades = window.saveSemesterGrades || saveSemesterGrades;
+window.toggleSubject = window.toggleSubject || toggleSubject;
+window.loadSubjectsForSemester = window.loadSubjectsForSemester || loadSubjectsForSemester;
+window.quickAddSubject = window.quickAddSubject || quickAddSubject;
+window.showDropSubjectsMode = window.showDropSubjectsMode || showDropSubjectsMode;
+window.deleteSelectedCourses = window.deleteSelectedCourses || deleteSelectedCourses;
+window.alert = window.alert || function(m) { showNotification(m, 'info'); };
+
+// ============================================
+// ADVISING APPOINTMENT BOOKING
+// ============================================
+
+let _advisingSlot = null;       // current active advisor slot
+let _selectedWindow = null;     // the time window the student clicked
+
+async function initAdvisingBooking() {
+    // Reset state
+    _advisingSlot = null;
+    _selectedWindow = null;
+
+    const slotsContainer = document.getElementById('advisor-slots-container');
+    const tableBody = document.getElementById('advisor-slots-table-body');
+    const noSlotMsg = document.getElementById('no-advisor-slot-msg');
+    const formContainer = document.getElementById('booking-form-container');
+
+    if (!slotsContainer || !tableBody) return;
+
+    // Show loading state
+    slotsContainer.style.display = 'none';
+    noSlotMsg.style.display = 'none';
+    formContainer.style.display = 'none';
+
+    try {
+        const slots = await apiFetch('/advising/slots');
+
+        if (!Array.isArray(slots) || slots.length === 0) {
+            noSlotMsg.style.display = 'block';
+            return;
+        }
+
+        // Render slots into table
+        tableBody.innerHTML = slots.map(s => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                <td style="padding:12px 5px;">
+                    <div style="font-weight:600; color:var(--text-primary);">${escapeHtml(s.advisor_name || 'Advisor')}</div>
+                </td>
+                <td style="padding:12px 5px;">
+                    <div style="color:#8B5CF6; font-weight:600;">${s.day_of_week}s</div>
+                    <div style="font-size:0.75rem; color:var(--muted);">${s.start_time} - ${s.end_time}</div>
+                </td>
+                <td style="padding:12px 5px; color:var(--text-secondary);">${escapeHtml(s.location)}</td>
+                <td style="padding:12px 5px; text-align:center;">
+                    <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick='selectAdvisorSlot(${JSON.stringify(s)})'>
+                        Choose
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        slotsContainer.style.display = 'block';
+        noSlotMsg.style.display = 'none';
+
+        // Load student's existing appointments
+        await _loadMyAppointments();
+
+    } catch (err) {
+        console.error('Advising slots fetch failed:', err);
+        noSlotMsg.style.display = 'block';
+    }
+}
+
+/** Called when student clicks "Choose" on a specific advisor's slot */
+window.selectAdvisorSlot = function(slot) {
+    _advisingSlot = slot;
+    _selectedWindow = null;
+    
+    const formContainer = document.getElementById('booking-form-container');
+    if (!formContainer) return;
+
+    // Update form header or info
+    const header = formContainer.querySelector('h4');
+    if (header) {
+        header.innerHTML = `<i class="fas fa-calendar-plus" style="color:#8B5CF6;"></i> Book a 15-Minute Slot`;
+    }
+
+    // Populate summary card
+    const nameEl = document.getElementById('booking-advisor-name');
+    const dayEl = document.getElementById('booking-advisor-day');
+    const locEl = document.getElementById('booking-advisor-loc');
+    if (nameEl) nameEl.textContent = slot.advisor_name || 'Advisor';
+    if (dayEl) dayEl.textContent = `${slot.day_of_week}s (${slot.start_time} - ${slot.end_time})`;
+    if (locEl) locEl.textContent = slot.location;
+
+    formContainer.style.display = 'block';
+    formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Populate dates for this specific slot
+    _populateDateSelect(slot.day_of_week);
+    
+    // Reset window grid
+    const grid = document.getElementById('booking-windows-grid');
+    if (grid) grid.innerHTML = '<span style="color:#64748b; font-size:0.9rem;">Select a date first</span>';
+    
+    const selectedTimeDisp = document.getElementById('booking-selected-time');
+    if (selectedTimeDisp) selectedTimeDisp.textContent = 'None';
+    
+    _updateSubmitBtn();
+};
+
+/** Populate the date <select> with the next 4 Mondays (or whatever day) */
+function _populateDateSelect(dayName) {
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const target = days.indexOf(dayName);
+    const select = document.getElementById('booking-date-select');
+    if (!select) return;
+    select.innerHTML = '<option value="">-- pick a date --</option>';
+
+    const today = new Date();
+    let count = 0;
+    let d = new Date(today);
+
+    // Advance to first future occurrence
+    while (count < 4) {
+        d.setDate(d.getDate() + 1);
+        if (d.getDay() === target) {
+            // Use local date parts to avoid timezone shifts from toISOString()
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const iso = `${year}-${month}-${day}`;
+            
+            const label = d.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+            const opt = document.createElement('option');
+            opt.value = iso;
+            opt.textContent = label;
+            select.appendChild(opt);
+            count++;
+        }
+    }
+}
+
+/** Called when date changes — fetch availability windows from API */
+async function loadBookingWindows() {
+    const select = document.getElementById('booking-date-select');
+    const grid = document.getElementById('booking-windows-grid');
+    const selectedDate = select ? select.value : null;
+
+    if (!selectedDate || !_advisingSlot) {
+        grid.innerHTML = '<span style="color:#64748b; font-size:0.9rem;">Select a date first</span>';
+        return;
+    }
+
+    grid.innerHTML = '<span style="color:#64748b; font-size:0.85rem;">Loading...</span>';
+    _selectedWindow = null;
+    _updateSubmitBtn();
+
+    try {
+        const data = await apiFetch(`/advising/slots/${_advisingSlot.id}/availability?date=${selectedDate}`);
+        grid.innerHTML = '';
+
+        if (!data || !data.windows || data.windows.length === 0) {
+            grid.innerHTML = '<span style="color:#ef4444; font-size:0.85rem;">No slots available for this date.</span>';
+            return;
+        }
+
+        let addedCount = 0;
+        data.windows.forEach(win => {
+            if (!win.available) return; // Skip taken slots
+
+            addedCount++;
+            const btn = document.createElement('button');
+            btn.textContent = win.start;
+            btn.className = 'booking-window-btn';
+            btn.style.cssText = `
+                padding: 8px 16px;
+                border-radius: 20px;
+                border: 2px solid #8B5CF6;
+                background: transparent;
+                color: #8B5CF6;
+                font-weight: 600;
+                font-size: 0.85rem;
+                cursor: pointer;
+                transition: all 0.15s;
+                font-family: inherit;
+            `;
+            btn.onclick = () => selectBookingWindow(win.start, btn);
+            grid.appendChild(btn);
+        });
+
+        if (addedCount === 0) {
+            grid.innerHTML = '<span style="color:#ef4444; font-size:0.85rem;">All slots are fully booked for this date.</span>';
+        }
+    } catch (err) {
+        console.error('Error loading booking windows:', err);
+        grid.innerHTML = '<span style="color:#ef4444; font-size:0.85rem;">Error loading availability.</span>';
+    }
+}
+
+/** Highlight chosen time window */
+function selectBookingWindow(startTime, clickedBtn) {
+    // De-select all
+    document.querySelectorAll('.booking-window-btn').forEach(b => {
+        b.style.background = 'transparent';
+        b.style.color = '#8B5CF6';
+    });
+    // Highlight selected
+    clickedBtn.style.background = '#8B5CF6';
+    clickedBtn.style.color = 'white';
+
+    _selectedWindow = startTime;
+    document.getElementById('booking-selected-time').textContent = `Selected: ${startTime}`;
+    _updateSubmitBtn();
+}
+
+function _updateSubmitBtn() {
+    const btn = document.getElementById('booking-submit-btn');
+    if (!btn) return;
+    if (_selectedWindow) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+    } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+    }
+}
+
+/** Student confirms and books the selected window */
+async function submitAppointmentBooking() {
+    if (!_selectedWindow || !_advisingSlot) return;
+
+    const date = document.getElementById('booking-date-select').value;
+    const purpose = document.getElementById('booking-purpose').value;
+    const notes = document.getElementById('booking-notes').value.trim();
+
+    if (!date) {
+        showNotification('Please select a date first', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('booking-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Booking...';
+
+    try {
+        await apiFetch('/advising/appointments', {
+            method: 'POST',
+            body: JSON.stringify({
+                slot_id: _advisingSlot.id,
+                appointment_date: date,
+                start_time: _selectedWindow,
+                purpose,
+                purpose_notes: notes || null,
+            }),
+        });
+
+        showNotification('Appointment booked successfully! ✅', 'success');
+
+        // Reset form
+        document.getElementById('booking-date-select').value = '';
+        document.getElementById('booking-notes').value = '';
+        document.getElementById('booking-windows-grid').innerHTML =
+            '<span style="color:#64748b; font-size:0.9rem;">Select a date first</span>';
+        document.getElementById('booking-selected-time').textContent = '';
+        _selectedWindow = null;
+        _updateSubmitBtn();
+
+        // Refresh the appointments list
+        await _loadMyAppointments();
+
+    } catch (err) {
+        showNotification(err.message || 'Booking failed. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Appointment';
+    }
+}
+
+/** Load and render the student's own appointments */
+async function _loadMyAppointments() {
+    const section = document.getElementById('my-appointments-section');
+    const list = document.getElementById('my-appointments-list');
+    const ratingsSection = document.getElementById('pending-ratings-section');
+    const ratingsList = document.getElementById('pending-ratings-list');
+    if (!section || !list) return;
+
+    try {
+        const appointments = await apiFetch('/advising/appointments/me');
+        if (!appointments || !appointments.length) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        const today = new Date().toISOString().split('T')[0];
+        const pending = [];
+        const upcoming = appointments.filter(a => a.appointment_date >= today && a.status === 'booked');
+        const past = appointments.filter(a => a.appointment_date < today || a.status === 'completed');
+
+        list.innerHTML = upcoming.map(a => `
+            <div style="
+                background: rgba(30,41,59,0.5); border:1px solid rgba(139,92,246,0.2);
+                border-radius:16px; padding:1rem 1.2rem; margin-bottom:10px;
+                display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;
+            ">
+                <div>
+                    <div style="font-weight:700; color:#e2e8f0;">
+                        ${a.advisor_name || 'Advisor'} — ${a.appointment_date}
+                    </div>
+                    <div style="font-size:0.85rem; color:#8B5CF6; margin-top:2px;">
+                        ${a.start_time} – ${a.end_time}
+                    </div>
+                    <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+                        ${a.location || ''} &nbsp;•&nbsp; ${a.purpose}
+                    </div>
+                </div>
+                <button onclick="cancelMyAppointment(${a.id})" style="
+                    background:none; border:1px solid #ef4444; color:#ef4444;
+                    padding:6px 14px; border-radius:20px; font-size:0.8rem; cursor:pointer;
+                    font-family:inherit; font-weight:600;
+                ">Cancel</button>
+            </div>
+        `).join('');
+
+        // Past meetings that need rating
+        past.forEach(a => {
+            if (!a.outcome || a.outcome.student_rating === null) {
+                pending.push(a);
+            }
+        });
+
+        if (pending.length > 0) {
+            ratingsSection.style.display = 'block';
+            ratingsList.innerHTML = pending.map(a => `
+                <div style="
+                    background: rgba(30,41,59,0.5); border:1px solid rgba(245,158,11,0.2);
+                    border-radius:16px; padding:1rem 1.2rem; margin-bottom:12px;
+                ">
+                    <div style="font-weight:700; color:#e2e8f0; margin-bottom:0.5rem;">
+                        ${a.advisor_name || 'Advisor'} — ${a.appointment_date} at ${a.start_time}
+                    </div>
+                    <div style="display:flex; gap:6px; margin-bottom:8px;" id="stars-${a.id}">
+                        ${[1,2,3,4,5].map(n => `
+                            <span onclick="_setRatingStar(${a.id},${n})" data-star="${n}" style="
+                                font-size:1.4rem; cursor:pointer; color:#475569; transition:color 0.1s;
+                            ">★</span>
+                        `).join('')}
+                    </div>
+                    <input type="text" id="feedback-${a.id}" class="input"
+                        placeholder="Leave a comment (optional)" style="margin-bottom:8px;">
+                    <button onclick="submitRating(${a.id})" style="
+                        background:linear-gradient(135deg,#f59e0b,#d97706); color:white;
+                        border:none; padding:8px 18px; border-radius:12px; font-size:0.85rem;
+                        cursor:pointer; font-family:inherit; font-weight:600;
+                    "><i class="fas fa-star"></i> Submit Rating</button>
+                </div>
+            `).join('');
+        } else {
+            ratingsSection.style.display = 'none';
+        }
+
+    } catch (err) {
+        console.warn('Failed to load appointments:', err);
+    }
+}
+
+function _setRatingStar(appointmentId, value) {
+    const container = document.getElementById(`stars-${appointmentId}`);
+    if (!container) return;
+    container.querySelectorAll('[data-star]').forEach(s => {
+        s.style.color = parseInt(s.dataset.star) <= value ? '#f59e0b' : '#475569';
+    });
+    container.dataset.selected = value;
+}
+
+async function submitRating(appointmentId) {
+    const container = document.getElementById(`stars-${appointmentId}`);
+    const rating = container ? parseInt(container.dataset.selected || '0') : 0;
+    const feedback = (document.getElementById(`feedback-${appointmentId}`)?.value || '').trim();
+
+    if (!rating) {
+        showNotification('Please select a star rating first', 'error');
+        return;
+    }
+
+    try {
+        await apiFetch(`/advising/appointments/${appointmentId}/outcome/student`, {
+            method: 'PATCH',
+            body: JSON.stringify({ rating, feedback: feedback || null }),
+        });
+        showNotification('Rating submitted! Thank you.', 'success');
+        await _loadMyAppointments();
+    } catch (err) {
+        showNotification(err.message || 'Failed to submit rating', 'error');
+    }
+}
+
+async function cancelMyAppointment(appointmentId) {
+    if (!confirm('Cancel this appointment?')) return;
+    try {
+        await apiFetch(`/advising/appointments/${appointmentId}`, { method: 'DELETE' });
+        showNotification('Appointment cancelled', 'info');
+        await _loadMyAppointments();
+        loadBookingWindows(); // refresh windows if same date still selected
+    } catch (err) {
+        showNotification(err.message || 'Could not cancel appointment', 'error');
+    }
+}
+
+window.loadBookingWindows = window.loadBookingWindows || loadBookingWindows;
+window.submitAppointmentBooking = window.submitAppointmentBooking || submitAppointmentBooking;
+window.cancelMyAppointment = window.cancelMyAppointment || cancelMyAppointment;
+window.submitRating = window.submitRating || submitRating;
+window.selectBookingWindow = window.selectBookingWindow || selectBookingWindow;
+window.initAdvisingBooking = window.initAdvisingBooking || initAdvisingBooking;
+
+let _chatMeetupSlot = null;
+let _chatMeetupWindow = null;
+let _chatMeetupInitStartedAt = 0;
+
+function _nextFourDatesForDay(dayName) {
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const target = days.indexOf(dayName);
+    const dates = [];
+    const d = new Date();
+    while (dates.length < 4) {
+        d.setDate(d.getDate() + 1);
+        if (d.getDay() === target) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            dates.push({ value: `${y}-${m}-${day}`, label: d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) });
+        }
+    }
+    return dates;
+}
+
+async function initChatMeetupBooking() {
+    const wrap = document.getElementById('chat-meetup-slots');
+    const dateSelect = document.getElementById('chat-meetup-date');
+    const windows = document.getElementById('chat-meetup-windows');
+    const purpose = document.getElementById('chat-meetup-purpose');
+    const reason = document.getElementById('chat-meetup-reason');
+    const submit = document.getElementById('chat-meetup-submit');
+    if (!wrap) return;
+    _chatMeetupSlot = null;
+    _chatMeetupWindow = null;
+    wrap.innerHTML = `
+        <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px">Book an Appointment</div>
+        <div style="color:var(--muted)">Loading slots...</div>
+    `;
+    if (dateSelect) dateSelect.style.display = 'none';
+    if (windows) windows.innerHTML = '<span>Select an appointment date to show times.</span>';
+    if (purpose) purpose.style.display = 'none';
+    if (reason) reason.style.display = 'none';
+    if (submit) {
+        submit.style.display = 'none';
+        submit.disabled = true;
+        submit.style.opacity = '0.55';
+    }
+    loadChatMeetupAppointments();
+    const getApi = () => (window.apiFetch && window.apiFetch !== apiFetch ? window.apiFetch : apiFetch);
+    try {
+        let slots = [];
+        try {
+            slots = await withTimeout(getApi()('/advising/student/slots'), 18000, 'Meetup slots request timed out.');
+        } catch (studentSlotsError) {
+            console.warn('Student slots endpoint failed, falling back to /advising/slots:', studentSlotsError);
+            slots = await withTimeout(getApi()('/advising/slots'), 18000, 'Meetup slots request timed out.');
+        }
+        if (!Array.isArray(slots) || !slots.length) {
+            wrap.innerHTML = `
+                <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px">Book an Appointment</div>
+                <div style="color:var(--muted)">No active advisor meetup slots are available yet.</div>
+            `;
+            return;
+        }
+        if (slots.length === 1) {
+            selectChatMeetupSlot(slots[0]);
+        } else {
+            wrap.innerHTML = `
+                <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px">Book an Appointment</div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px">
+                    ${slots.map(slot => `
+                        <button class="link-btn" style="padding:12px 16px;border-radius:999px" onclick='selectChatMeetupSlot(${JSON.stringify(slot)})'>
+                            ${escapeHtml(slot.day_of_week)} ${escapeHtml(slot.start_time)} - ${escapeHtml(slot.end_time)}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        }
+    } catch (e) {
+        wrap.innerHTML = `
+            <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px">Book an Appointment</div>
+            <div style="color:#ef4444">${escapeHtml(e.message || 'Could not load meetup slots from advisor_slots.')}</div>
+        `;
+        const list = document.getElementById('chat-meetup-appointments-list');
+        if (list) list.textContent = 'Could not load appointments until the server responds.';
+    }
+}
+
+function initializeAdvisorMeetupsPage() {
+    const now = Date.now();
+    if (now - _chatMeetupInitStartedAt < 500) return;
+    _chatMeetupInitStartedAt = now;
+    if (typeof window.stopStudentChatPolling === 'function') window.stopStudentChatPolling();
+    initChatMeetupBooking();
+}
+
+function withTimeout(promise, ms, message) {
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function selectChatMeetupSlot(slot) {
+    _chatMeetupSlot = slot;
+    _chatMeetupWindow = null;
+    const wrap = document.getElementById('chat-meetup-slots');
+    const dateSelect = document.getElementById('chat-meetup-date');
+    const windows = document.getElementById('chat-meetup-windows');
+    const purpose = document.getElementById('chat-meetup-purpose');
+    const reason = document.getElementById('chat-meetup-reason');
+    const submit = document.getElementById('chat-meetup-submit');
+    if (wrap) {
+        wrap.innerHTML = `
+            <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px">Book an Appointment</div>
+            <div style="display:flex;gap:38px;align-items:center;flex-wrap:wrap;font-size:0.96rem">
+                <span><strong>${escapeHtml(slot.day_of_week)}</strong> ${escapeHtml(slot.start_time)} - ${escapeHtml(slot.end_time)}</span>
+                <span>${escapeHtml(slot.location || 'TBA')}</span>
+                <span>${escapeHtml(slot.advisor_name || 'Advisor')}</span>
+            </div>
+        `;
+    }
+    if (dateSelect) {
+        const dates = _nextFourDatesForDay(slot.day_of_week);
+        dateSelect.innerHTML = dates
+            .map(d => `<option value="${d.value}">${escapeHtml(d.label)}</option>`)
+            .join('');
+        dateSelect.style.display = 'block';
+        if (dates.length) dateSelect.value = dates[0].value;
+    }
+    if (windows) windows.innerHTML = '<span>Loading available times...</span>';
+    if (purpose) purpose.style.display = 'block';
+    if (reason) reason.style.display = 'block';
+    if (submit) {
+        submit.style.display = 'block';
+        submit.disabled = true;
+        submit.style.opacity = '0.55';
+    }
+    setTimeout(() => loadChatMeetupWindows(), 0);
+}
+
+async function loadChatMeetupWindows() {
+    const dateSelect = document.getElementById('chat-meetup-date');
+    const windows = document.getElementById('chat-meetup-windows');
+    const submit = document.getElementById('chat-meetup-submit');
+    if (!dateSelect?.value || !_chatMeetupSlot || !windows) return;
+    _chatMeetupWindow = null;
+    if (submit) submit.disabled = true;
+    windows.innerHTML = '<span>Loading...</span>';
+    try {
+        const getApi = () => (window.apiFetch && window.apiFetch !== apiFetch ? window.apiFetch : apiFetch);
+        const data = await getApi()(`/advising/slots/${_chatMeetupSlot.id}/availability?date=${dateSelect.value}`);
+        const available = (data.windows || []).filter(w => w.available);
+        if (!available.length) {
+            windows.innerHTML = '<span style="color:#ef4444">No free 15-minute slots.</span>';
+            return;
+        }
+        windows.innerHTML = available.map(w => `
+            <button class="link-btn chat-meetup-time-btn" onclick="selectChatMeetupWindow('${escapeHtml(w.start)}', this)"
+                style="border:2px solid #8B5CF6;color:#a78bfa;border-radius:999px;padding:9px 22px;font-weight:800;background:transparent">
+                ${escapeHtml(w.start)}
+            </button>
+        `).join('');
+    } catch (e) {
+        windows.innerHTML = '<span style="color:#ef4444">Could not load times.</span>';
+    }
+}
+
+function selectChatMeetupWindow(start, btn) {
+    _chatMeetupWindow = start;
+    document.querySelectorAll('#chat-meetup-windows .chat-meetup-time-btn').forEach(b => {
+        b.style.background = 'transparent';
+        b.style.color = '#a78bfa';
+    });
+    btn.style.background = 'rgba(139,92,246,0.22)';
+    btn.style.color = '#fff';
+    const submit = document.getElementById('chat-meetup-submit');
+    if (submit) {
+        submit.disabled = false;
+        submit.style.opacity = '1';
+    }
+}
+
+async function submitChatMeetupBooking() {
+    const date = document.getElementById('chat-meetup-date')?.value;
+    const purpose = document.getElementById('chat-meetup-purpose')?.value || 'inquiry';
+    const reason = document.getElementById('chat-meetup-reason')?.value.trim() || '';
+    if (!_chatMeetupSlot || !_chatMeetupWindow || !date) return;
+    try {
+        const getApi = () => (window.apiFetch && window.apiFetch !== apiFetch ? window.apiFetch : apiFetch);
+        await getApi()('/advising/appointments', {
+            method: 'POST',
+            body: JSON.stringify({
+                slot_id: _chatMeetupSlot.id,
+                appointment_date: date,
+                start_time: _chatMeetupWindow,
+                purpose,
+                purpose_notes: reason || null,
+            }),
+        });
+        showNotification('Meetup booked successfully.', 'success');
+        await initChatMeetupBooking();
+        await loadChatMeetupAppointments();
+    } catch (e) {
+        showNotification(e.message || 'Could not book meetup.', 'error');
+    }
+}
+
+async function loadChatMeetupAppointments() {
+    const list = document.getElementById('chat-meetup-appointments-list');
+    if (!list) return;
+    list.textContent = 'Loading appointments...';
+    try {
+        const getApi = () => (window.apiFetch && window.apiFetch !== apiFetch ? window.apiFetch : apiFetch);
+        const appointments = await getApi()('/advising/appointments/me');
+        const visible = (appointments || []).filter((appt) => appt.status !== 'cancelled');
+        if (!visible.length) {
+            list.textContent = 'No appointments booked yet.';
+            return;
+        }
+        const today = new Date().toISOString().split('T')[0];
+        const pendingFeedback = [];
+        list.innerHTML = visible.map((appt) => {
+            const canFeedback = (appt.status === 'completed' || appt.appointment_date < today) && !appt.outcome?.student_rating;
+            if (canFeedback) pendingFeedback.push(appt);
+            return `
+            <div style="border:1px solid rgba(139,92,246,0.24);border-radius:16px;background:rgba(30,41,59,0.36);padding:14px 18px;margin-bottom:10px;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
+                <div>
+                    <div style="font-weight:800;color:var(--text)">${escapeHtml(appt.advisor_name || 'Advisor')}</div>
+                    <div style="margin-top:4px;color:var(--muted)">${escapeHtml(appt.appointment_date)} - ${escapeHtml(appt.start_time)} - ${escapeHtml(appt.end_time)} - ${escapeHtml(appt.location || 'TBA')}</div>
+                    ${appt.purpose_notes ? `<div style="margin-top:4px;color:var(--muted);font-size:0.88rem">${escapeHtml(appt.purpose_notes)}</div>` : ''}
+                    ${appt.outcome?.advisor_notes ? `<div style="margin-top:6px;color:#c4b5fd;font-size:0.86rem"><strong>Advisor notes:</strong> ${escapeHtml(appt.outcome.advisor_notes)}</div>` : ''}
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;min-width:210px">
+                    <span style="border-radius:999px;padding:6px 12px;background:rgba(139,92,246,0.16);color:#c4b5fd;font-weight:800;font-size:0.82rem;text-transform:capitalize">${escapeHtml(appt.status || 'booked')}</span>
+                    ${canFeedback ? `
+                        <button class="link-btn" onclick='openStudentMeetingFeedbackModal(${JSON.stringify(appt).replace(/'/g, '&#39;')})' style="padding:7px 10px">Add Report</button>
+                    ` : ''}
+                    ${appt.outcome?.student_rating ? `<span style="color:var(--muted);font-size:0.82rem">Your rating: ${escapeHtml(String(appt.outcome.student_rating))}/5</span>` : ''}
+                </div>
+            </div>
+        `}).join('');
+        if (pendingFeedback.length) {
+            const firstPending = pendingFeedback[0];
+            const key = `edumate_meetup_feedback_prompt_${firstPending.id}`;
+            if (!sessionStorage.getItem(key)) {
+                sessionStorage.setItem(key, '1');
+                setTimeout(() => openStudentMeetingFeedbackModal(firstPending), 250);
+            }
+        }
+    } catch (e) {
+        list.innerHTML = `<span style="color:#ef4444">${escapeHtml(e.message || 'Could not load appointments.')}</span>`;
+    }
+}
+
+function ensureStudentMeetingFeedbackModal() {
+    if (document.getElementById('studentMeetingFeedbackModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'studentMeetingFeedbackModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px';
+    modal.innerHTML = `
+        <div style="width:min(92vw,520px);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:26px;position:relative;color:var(--text)">
+            <button onclick="closeStudentMeetingFeedbackModal()" style="position:absolute;right:18px;top:14px;background:none;border:none;color:var(--muted);font-size:26px;cursor:pointer">&times;</button>
+            <h3 style="margin:0 0 8px;font-size:1.25rem">Meeting Feedback</h3>
+            <p id="studentFeedbackMeta" style="margin:0 0 18px;color:var(--muted)"></p>
+            <input type="hidden" id="studentFeedbackAppointmentId">
+            <input type="hidden" id="studentFeedbackRating">
+            <label style="display:block;font-weight:800;margin-bottom:8px">Rate the meeting out of 5</label>
+            <div id="studentFeedbackRatingRow" style="display:flex;gap:8px;margin-bottom:16px">
+                ${[1,2,3,4,5].map(n => `<button type="button" onclick="setStudentFeedbackRating(${n})" style="width:42px;height:42px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-weight:800;cursor:pointer">${n}</button>`).join('')}
+            </div>
+            <label style="display:block;font-weight:800;margin-bottom:8px">Your report / reason</label>
+            <textarea id="studentFeedbackText" class="input" rows="5" placeholder="Was your reason handled? Add details for the advisor/admin." style="min-height:120px;resize:vertical"></textarea>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+                <button class="link-btn" onclick="closeStudentMeetingFeedbackModal()">Later</button>
+                <button class="btn" onclick="submitMeetupFeedback()">Submit Feedback</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function openStudentMeetingFeedbackModal(appt) {
+    ensureStudentMeetingFeedbackModal();
+    document.getElementById('studentFeedbackAppointmentId').value = appt.id;
+    document.getElementById('studentFeedbackRating').value = '';
+    document.getElementById('studentFeedbackMeta').textContent = `${appt.advisor_name || 'Advisor'} - ${appt.appointment_date || ''} ${appt.start_time || ''}`;
+    document.getElementById('studentFeedbackText').value = appt.purpose_notes ? `Reason: ${appt.purpose_notes}\n\nReport: ` : '';
+    document.querySelectorAll('#studentFeedbackRatingRow button').forEach(btn => {
+        btn.style.background = 'rgba(255,255,255,0.04)';
+        btn.style.borderColor = 'var(--border)';
+        btn.style.color = 'var(--text)';
+    });
+    document.getElementById('studentMeetingFeedbackModal').style.display = 'flex';
+}
+
+function closeStudentMeetingFeedbackModal() {
+    const modal = document.getElementById('studentMeetingFeedbackModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function setStudentFeedbackRating(value) {
+    document.getElementById('studentFeedbackRating').value = value;
+    document.querySelectorAll('#studentFeedbackRatingRow button').forEach((btn, index) => {
+        const active = index < value;
+        btn.style.background = active ? 'rgba(139,92,246,0.24)' : 'rgba(255,255,255,0.04)';
+        btn.style.borderColor = active ? '#8B5CF6' : 'var(--border)';
+        btn.style.color = active ? '#fff' : 'var(--text)';
+    });
+}
+
+async function submitMeetupFeedback(appointmentId) {
+    const id = appointmentId || parseInt(document.getElementById('studentFeedbackAppointmentId')?.value || '0', 10);
+    const rating = parseInt(document.getElementById('studentFeedbackRating')?.value || '0', 10);
+    const feedback = document.getElementById('studentFeedbackText')?.value.trim() || '';
+    if (!id) return;
+    if (!rating) {
+        showNotification('Please choose a rating first.', 'error');
+        return;
+    }
+    if (!feedback) {
+        showNotification('Please write a short meeting report.', 'error');
+        return;
+    }
+    try {
+        const getApi = () => (window.apiFetch && window.apiFetch !== apiFetch ? window.apiFetch : apiFetch);
+        await getApi()(`/advising/appointments/${id}/outcome/student`, {
+            method: 'PATCH',
+            body: JSON.stringify({ rating, feedback }),
+        });
+        showNotification('Meeting feedback saved.', 'success');
+        closeStudentMeetingFeedbackModal();
+        await loadChatMeetupAppointments();
+    } catch (e) {
+        showNotification(e.message || 'Could not save feedback.', 'error');
+    }
+}
+
+window.initChatMeetupBooking = initChatMeetupBooking;
+window.initializeAdvisorMeetupsPage = initializeAdvisorMeetupsPage;
+window.selectChatMeetupSlot = selectChatMeetupSlot;
+window.loadChatMeetupWindows = loadChatMeetupWindows;
+window.selectChatMeetupWindow = selectChatMeetupWindow;
+window.submitChatMeetupBooking = submitChatMeetupBooking;
+window.loadChatMeetupAppointments = loadChatMeetupAppointments;
+window.submitMeetupFeedback = submitMeetupFeedback;
+window.openStudentMeetingFeedbackModal = openStudentMeetingFeedbackModal;
+window.closeStudentMeetingFeedbackModal = closeStudentMeetingFeedbackModal;
+window.setStudentFeedbackRating = setStudentFeedbackRating;
+window.showSemesterGradeModal = showSemesterGradeModal;
+window.saveSemesterGrades = saveSemesterGrades;
+window.showGradeModal = showGradeModal;
 window.setGrade = setGrade;
 window.clearGrade = clearGrade;
-window.alert = function(m) { showNotification(m, 'info'); };
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[onclick*="advisor-meetups"]').forEach((link) => {
+        link.addEventListener('click', () => {
+            setTimeout(() => initializeAdvisorMeetupsPage(), 300);
+        });
+    });
+
+    const meetupsPage = document.getElementById('advisor-meetups');
+    if (meetupsPage) {
+        const observer = new MutationObserver(() => {
+            if (meetupsPage.classList.contains('active')) {
+                setTimeout(() => initializeAdvisorMeetupsPage(), 0);
+            }
+        });
+        observer.observe(meetupsPage, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    setTimeout(() => {
+        if (meetupsPage?.classList.contains('active')) initializeAdvisorMeetupsPage();
+    }, 0);
+});
+
+})(); // End IIFE wrapper

@@ -389,6 +389,16 @@ body:not(.dark-theme) .main-content {
     gap: 15px;
 }
 
+.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--card);
+    padding: 15px 0;
+    border-bottom: 1px solid var(--border);
+    margin-top: -10px;
+}
+
 /* Login */
 .login-root {
     min-height: calc(100vh - var(--header-height) - 40px);

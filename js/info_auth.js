@@ -245,7 +245,10 @@ async function handleLogin() {
     if (window.handleLogin && window.handleLogin !== handleLogin) {
         return await window.handleLogin.apply(this, arguments);
     }
-    console.warn('handleLogin is handled by backend_api.js');
+    const msg = 'The login system is still initializing or backend_api.js failed to load. Please refresh the page.';
+    console.error(msg);
+    if (typeof Toast !== 'undefined') Toast.error(msg);
+    else alert(msg);
 }
 
 // Handle social login - Disabled with new rules
@@ -298,7 +301,7 @@ if (savedTheme === 'dark') {
 }
 
 // Export for global use
-// window.handleLogin = handleLogin;
+window.handleLogin = handleLogin;
 window.handleSocialLogin = handleSocialLogin;
 window.handleForgotPassword = handleForgotPassword;
 window.toggleTheme = toggleTheme;

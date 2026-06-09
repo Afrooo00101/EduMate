@@ -1,5 +1,5 @@
 (function () {
-    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://localhost:8000/api/v1';
+    const API_BASE = window.__EDUMATE_API_BASE__ || 'http://127.0.0.1:8001/api/v1';
     const TOKEN_KEY = 'edumate_access_token';
     const USER_KEY = 'edumate_current_user';
     const DEFAULT_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
@@ -16,6 +16,7 @@
         </svg>`
     )}`;
     const DEV_CAPTCHA_TOKEN = 'test-pass';
+    const REQUEST_TIMEOUT_MS = 20000;
 
     const legacySearchCourses = typeof window.searchCourses === 'function' ? window.searchCourses : null;
     const legacyLoadInternshipsByPosition = typeof window.loadInternshipsByPosition === 'function' ? window.loadInternshipsByPosition : null;
@@ -31,7 +32,15 @@
     let cachedSavedInternships = [];
     let latestATSResult = null;
 
+    // --- CRITICAL ASSIGNMENTS MOVED TO TOP ---
+    window.handleLogin = function () { return handleBackendLogin('index-page'); };
+    window.attemptLogin = function () { return handleBackendLogin('home-page'); };
+    // -----------------------------------------
+
     function normalizePopupMessage(message, fallback = 'Something went wrong.') {
+        if (typeof message === 'object') {
+            try { message = JSON.stringify(message); } catch (e) { message = String(message); }
+        }
         const text = String(message || fallback).replace(/\s+/g, ' ').trim();
         if (!text) return fallback;
         if (/127\.0\.0\.1|localhost|failed to fetch|networkerror|load failed/i.test(text)) {
@@ -224,6 +233,38 @@
         [TOKEN_KEY, USER_KEY, 'edumate_logged', 'edumate_admin_logged', 'edumate_username', 'edumate_user_email', 'edumate_user_type', 'edumate_major_name'].forEach((key) => sessionStorage.removeItem(key));
     }
 
+    function buildApiBases() {
+        const bases = [API_BASE];
+        try {
+            const url = new URL(API_BASE);
+            if (url.port === '8001') bases.push(API_BASE.replace(':8001', ':8000'));
+            if (url.port === '8000') bases.unshift(API_BASE.replace(':8000', ':8001'));
+        } catch (_error) {}
+
+        const variants = [];
+        bases.forEach((base) => {
+            variants.push(base);
+            if (base.includes('127.0.0.1')) variants.push(base.replace('127.0.0.1', 'localhost'));
+            if (base.includes('localhost')) variants.push(base.replace('localhost', '127.0.0.1'));
+        });
+        return [...new Set(variants)];
+    }
+
+    async function fetchWithTimeout(url, requestOptions, headers) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        try {
+            return await fetch(url, {
+                method: requestOptions.method || 'GET',
+                headers,
+                body: requestOptions.body,
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
     async function apiFetch(path, options) {
         const requestOptions = options || {};
         const headers = Object.assign({ Accept: 'application/json' }, requestOptions.headers || {});
@@ -237,15 +278,24 @@
             headers.Authorization = `Bearer ${token}`;
         }
 
-        let response;
-        try {
-            response = await fetch(`${API_BASE}${path}`, {
-                method: requestOptions.method || 'GET',
-                headers,
-                body: requestOptions.body,
-            });
-        } catch (_error) {
-            throw new Error('We could not connect to the server right now. Please try again in a moment.');
+        let response = null;
+        let lastNetworkError = null;
+        for (const base of buildApiBases()) {
+            try {
+                response = await fetchWithTimeout(`${base}${path}`, requestOptions, headers);
+                lastNetworkError = null;
+                break;
+            } catch (error) {
+                lastNetworkError = error;
+            }
+        }
+
+        if (!response) {
+            throw new Error(
+                lastNetworkError?.name === 'AbortError'
+                    ? 'The request took too long. Please try again.'
+                    : 'We could not connect to the server right now. Please try again in a moment.'
+            );
         }
 
         if (response.status === 401) {
@@ -255,7 +305,16 @@
             let detail = `Request failed (${response.status})`;
             try {
                 const data = await response.json();
-                detail = data.detail || detail;
+                if (data.detail) {
+                    if (Array.isArray(data.detail)) {
+                        detail = data.detail.map(err => {
+                            const field = err.loc ? err.loc[err.loc.length - 1] : 'unknown';
+                            return `${field}: ${err.msg}`;
+                        }).join(', ');
+                    } else {
+                        detail = data.detail;
+                    }
+                }
             } catch (_error) {}
             throw new Error(detail);
         }
@@ -263,6 +322,8 @@
         const text = await response.text();
         return text ? JSON.parse(text) : null;
     }
+
+    window.apiFetch = apiFetch;
 
     async function resolveMajors() {
         if (cachedMajors) return cachedMajors;
@@ -283,15 +344,27 @@
     }
 
     function getCaptchaToken(required) {
-        const isLocalApi = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?/i.test(API_BASE);
-        if (typeof window.grecaptcha !== 'undefined') {
-            const token = window.grecaptcha.getResponse();
-            if (required && !token && isLocalApi) return DEV_CAPTCHA_TOKEN;
-            if (required && !token) throw new Error('CAPTCHA required');
-            return token || '';
+        const isLocalApi = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(API_BASE);
+        
+        // --- LOCAL DEV BYPASS ---
+        if (required && isLocalApi) {
+            console.log('Local API detected, using DEV_CAPTCHA_TOKEN');
+            return DEV_CAPTCHA_TOKEN;
         }
-        if (required && isLocalApi) return DEV_CAPTCHA_TOKEN;
-        if (required) throw new Error('CAPTCHA is not available');
+        // -------------------------
+
+        if (typeof window.grecaptcha !== 'undefined') {
+            try {
+                const token = window.grecaptcha.getResponse();
+                if (required && !token) throw new Error('CAPTCHA required. Please solve the puzzle below.');
+                return token || '';
+            } catch (e) {
+                if (required) throw new Error('CAPTCHA verification failed: ' + e.message);
+                return '';
+            }
+        }
+        
+        if (required) throw new Error('CAPTCHA service is not available (ad-blocker?)');
         return '';
     }
 
@@ -488,13 +561,25 @@
     async function performLogin(email, password, remember, options) {
         const loginOptions = options || {};
         const captchaToken = loginOptions.captchaToken || getCaptchaToken(loginOptions.requireCaptcha !== false);
+        console.log('Login attempt with options:', loginOptions);
         const data = await apiFetch('/auth/login', {
             method: 'POST',
             auth: false,
             body: JSON.stringify({ email, password, captcha_token: captchaToken }),
         });
+        console.log('Login API response:', data);
 
-        setSession(data.student, data.access_token);
+        if (data.user && (data.user.role === 'admin' || data.user.role === 'advisor')) {
+            console.log('Admin/Advisor detected. Redirecting to:', data.user.role === 'advisor' ? 'advisor.html' : 'admin.html');
+            sessionStorage.setItem('edumate_admin_logged', '1');
+            sessionStorage.setItem('edumate_admin_email', data.user.email || '');
+            sessionStorage.setItem('edumate_user_type', data.user.role);
+            sessionStorage.setItem('edumate_admin_token', data.access_token);
+            sessionStorage.setItem('edumate_admin_user', JSON.stringify(data.user));
+            window.location.href = data.user.role === 'advisor' ? 'advisor.html' : 'admin.html';
+            return;
+        }
+        setSession(data.user?.student || data.user, data.access_token);
         if (remember) localStorage.setItem('edumate_remember', email);
         if (typeof window.grecaptcha !== 'undefined') {
             try { window.grecaptcha.reset(); } catch (_error) {}
@@ -502,10 +587,11 @@
         if (typeof window.updateSidebarFromStorage === 'function') window.updateSidebarFromStorage();
         if (typeof window.applyStoredProfileToUI === 'function') window.applyStoredProfileToUI();
         if (typeof window.logActivity === 'function') window.logActivity('signed_in', 'Signed in to EduMate');
-        return data.student;
+        return data.user?.student || data.user;
     }
 
     async function handleBackendLogin(redirectMode) {
+        console.log('handleBackendLogin called with mode:', redirectMode);
         const email = String(document.getElementById('login-email')?.value || '').trim();
         const password = String(document.getElementById('login-password')?.value || '').trim();
         const remember = !!document.getElementById('remember-me')?.checked;
@@ -524,7 +610,9 @@
                 window.location.href = student.is_admin ? 'admin.html' : 'home.html';
             }
         } catch (error) {
+            console.error('Login error:', error);
             notify(error.message || 'Login failed', 'error');
+            alert('Login Error: ' + (error.message || 'Unknown error'));
         }
     }
 
@@ -546,13 +634,22 @@
             }),
         });
 
-        setSession(data.student, data.access_token);
+        if (data.user && (data.user.role === 'admin' || data.user.role === 'advisor')) {
+            sessionStorage.setItem('edumate_admin_token', data.access_token);
+            sessionStorage.setItem('edumate_admin_user', JSON.stringify(data.user));
+            sessionStorage.setItem('edumate_admin_logged', '1');
+            sessionStorage.setItem('edumate_admin_email', data.user.email || '');
+            sessionStorage.setItem('edumate_user_type', data.user.role);
+            window.location.href = data.user.role === 'advisor' ? 'advisor.html' : 'admin.html';
+            return;
+        }
+        setSession(data.user?.student || data.user, data.access_token);
         if (typeof window.updateSidebarFromStorage === 'function') window.updateSidebarFromStorage();
         if (typeof window.applyStoredProfileToUI === 'function') window.applyStoredProfileToUI();
         if (typeof window.logActivity === 'function') {
             window.logActivity('social_signed_in', `Signed in with ${socialProfile?.provider || 'social login'}`);
         }
-        return data.student;
+        return data.user?.student || data.user;
     }
 
     async function firebaseSocialLogin(providerType) {
@@ -583,9 +680,6 @@
             idToken,
         });
     }
-
-    window.handleLogin = function () { return handleBackendLogin('index-page'); };
-    window.attemptLogin = function () { return handleBackendLogin('home-page'); };
     window.handleSocialLogin = async function (providerType) {
         try {
             const student = await firebaseSocialLogin(providerType);
@@ -1002,7 +1096,8 @@
         const container = document.getElementById('InternshipsContainer');
         if (!container) return;
         if (!items.length) {
-            container.innerHTML = `<div class="card" style="text-align:center;color:var(--muted);padding:40px"><p>No backend internships found for ${position || 'this position'}.</p></div>`;
+            const label = position ? getInternshipPositionLabel(position) : 'this position';
+            container.innerHTML = `<div class="card" style="text-align:center;color:var(--muted);padding:40px"><p>No internships found for ${label}. Try another career track.</p></div>`;
             return;
         }
         container.innerHTML = items.map((item) => `
@@ -1022,18 +1117,39 @@
         `).join('');
     }
 
+    function getInternshipPositionLabel(position) {
+        const labels = {
+            software: 'Software Development',
+            marketing: 'Marketing',
+            finance: 'Finance',
+            hr: 'Human Resources',
+            sales: 'Sales',
+            design: 'Design',
+            data: 'Data',
+            project: 'Project Management',
+        };
+        return labels[position] || position || 'this position';
+    }
+
+    function runLocalInternshipSearch(position) {
+        const fallback = window.loadInternshipsFromSearch || legacyLoadInternshipsByPosition;
+        if (typeof fallback === 'function') return fallback(position);
+        renderInternshipSearch([], position);
+        return null;
+    }
+
     window.loadInternshipsByPosition = async function (position) {
         const resolvedPosition = position || String(document.getElementById('jobPositionSelect')?.value || '').trim();
         if (!resolvedPosition) {
-            if (legacyLoadInternshipsByPosition) return legacyLoadInternshipsByPosition(position);
-            return;
+            return runLocalInternshipSearch(position);
         }
         try {
             const items = await apiFetch(`/internships?position=${encodeURIComponent(resolvedPosition)}`);
-            if ((!items || !items.length) && legacyLoadInternshipsByPosition) return legacyLoadInternshipsByPosition(resolvedPosition);
+            if (!items || !items.length) return runLocalInternshipSearch(resolvedPosition);
             renderInternshipSearch(items || [], resolvedPosition);
         } catch (error) {
-            if (legacyLoadInternshipsByPosition) return legacyLoadInternshipsByPosition(resolvedPosition);
+            const fallbackResult = runLocalInternshipSearch(resolvedPosition);
+            if (fallbackResult !== null) return fallbackResult;
             notify(error.message || 'Unable to load internships', 'error');
         }
     };
@@ -1432,4 +1548,154 @@
             }
         }
     });
+
+    // ══════════════════════════════════════════════════════════════════
+    //  STUDENT ↔ ADVISOR CHAT
+    // ══════════════════════════════════════════════════════════════════
+
+    let studentChatPollInterval = null;
+
+    async function loadStudentAdvisorMessages() {
+        const area = document.getElementById('studentChatMessages');
+        if (!area) return;
+        try {
+            const messages = await apiFetch('/chat/student/messages');
+            renderStudentChatMessages(messages);
+            // Update unread badge (now cleared because we fetched)
+            updateStudentChatBadge(0);
+        } catch (e) {
+            area.innerHTML = `<div style="text-align:center;color:var(--muted);padding:20px">${escapeHtml(e.message || 'Could not load messages')}</div>`;
+        }
+    }
+
+    function renderStudentChatMessages(messages) {
+        const area = document.getElementById('studentChatMessages');
+        if (!area) return;
+        if (!messages || !messages.length) {
+            area.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:0.9rem;margin-top:20px">No messages yet. Say hello! 👋</div>';
+            return;
+        }
+        area.innerHTML = messages.map(m => {
+            const isSent = m.sender_role === 'student';
+            const bubbleStyle = isSent
+                ? 'background:var(--primary);color:white;border-bottom-right-radius:4px'
+                : 'background:rgba(255,255,255,0.07);color:var(--text);border-bottom-left-radius:4px';
+            const wrapAlign = isSent ? 'justify-content:flex-end' : 'justify-content:flex-start';
+            const timeAlign = isSent ? 'text-align:right' : 'text-align:left';
+            const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return `
+            <div style="display:flex;${wrapAlign};width:100%">
+                <div style="max-width:min(72%,680px)">
+                    <div style="padding:10px 14px;border-radius:14px;font-size:0.9rem;line-height:1.5;word-break:break-word;${bubbleStyle}">${escapeHtml(m.content)}</div>
+                    <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;${timeAlign}">${time}</div>
+                </div>
+            </div>`;
+        }).join('');
+        area.scrollTop = area.scrollHeight;
+    }
+
+    async function loadStudentAdvisorInfo() {
+        const nameEl = document.getElementById('studentAdvisorName');
+        const avatarEl = document.getElementById('studentAdvisorAvatar');
+        try {
+            const advisor = await apiFetch('/chat/student/advisor');
+            if (advisor && advisor.advisor_id) {
+                const advisorName = advisor.advisor_name || advisor.advisor_email || 'Your Advisor';
+                if (nameEl) nameEl.textContent = advisorName;
+                if (avatarEl) avatarEl.textContent = advisorName.slice(0, 2).toUpperCase();
+            } else {
+                if (nameEl) nameEl.textContent = 'No advisor assigned';
+                if (avatarEl) avatarEl.textContent = '--';
+            }
+        } catch (e) {
+            if (nameEl) nameEl.textContent = e.message && e.message.includes('No advisor') ? 'No advisor assigned' : 'Academic Advisor';
+            if (avatarEl && e.message && e.message.includes('No advisor')) avatarEl.textContent = '--';
+        }
+    }
+
+    async function updateStudentUnreadBadge() {
+        try {
+            const data = await apiFetch('/chat/student/unread-count');
+            updateStudentChatBadge(data.unread || 0);
+        } catch (_e) {}
+    }
+
+    function updateStudentChatBadge(count) {
+        const badge = document.getElementById('student-chat-badge');
+        if (!badge) return;
+        if (count > 0) {
+            badge.textContent = count > 9 ? '9+' : count;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    window.studentSendMessage = async function () {
+        const input = document.getElementById('studentChatInput');
+        if (!input) return;
+        const content = input.value.trim();
+        if (!content) return;
+        input.disabled = true;
+        try {
+            await apiFetch('/chat/student/messages', {
+                method: 'POST',
+                body: JSON.stringify({ content }),
+            });
+            input.value = '';
+            input.style.height = 'auto';
+            await loadStudentAdvisorMessages();
+        } catch (e) {
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(e.message || 'Failed to send message', 'error');
+            } else {
+                alert(e.message || 'Failed to send message');
+            }
+        } finally {
+            input.disabled = false;
+            input.focus();
+        }
+    };
+
+    function startStudentChatPolling() {
+        stopStudentChatPolling();
+        studentChatPollInterval = setInterval(async () => {
+            await loadStudentAdvisorMessages();
+        }, 5000);
+    }
+
+    function stopStudentChatPolling() {
+        if (studentChatPollInterval) { clearInterval(studentChatPollInterval); studentChatPollInterval = null; }
+    }
+
+    // Expose student chat functions globally so home_script.js runPageInit can call them
+    window.loadStudentAdvisorInfo = loadStudentAdvisorInfo;
+    window.loadStudentAdvisorMessages = loadStudentAdvisorMessages;
+    window.startStudentChatPolling = startStudentChatPolling;
+    window.stopStudentChatPolling = stopStudentChatPolling;
+
+    // Setup Enter key for student chat
+    document.addEventListener('DOMContentLoaded', () => {
+        const inp = document.getElementById('studentChatInput');
+        if (inp) {
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    window.studentSendMessage();
+                }
+            });
+            inp.addEventListener('input', () => {
+                inp.style.height = 'auto';
+                inp.style.height = Math.min(inp.scrollHeight, 100) + 'px';
+            });
+        }
+
+        // Poll unread count every 30s while logged in (student portal)
+        setInterval(() => {
+            if (getToken() && document.getElementById('student-chat-badge')) {
+                updateStudentUnreadBadge();
+            }
+        }, 30000);
+    });
+
 })();

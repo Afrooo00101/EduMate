@@ -11,11 +11,95 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     
-    <!-- Chart.js -->admin
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- CSS -->
     <link rel="stylesheet" href="css/admin_style.css">
+
+    <style>
+
+/* COURSES */
+.courses-container{padding:20px}
+
+.add{background:green;color:white;padding:8px 12px;border:none;border-radius:6px;cursor:pointer}
+.edit{background:orange;color:white}
+.delete{background:red;color:white}
+
+table { width: 100%; margin-top: 0; border-collapse: separate; border-spacing: 0; background: var(--card); }
+td, th { padding: 14px 12px; border-bottom: 1px solid var(--border); text-align: center; }
+th { position: sticky; top: 0; background: #1e293b; z-index: 100; color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; border-bottom: 2px solid var(--primary); }
+tr:hover td { background: rgba(255,255,255,0.03); }
+
+#coursesTableWrap {
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #111827;
+}
+
+.btn{background:var(--primary);color:white;padding:10px 18px;border:none;border-radius:10px;cursor:pointer;font-weight:600;transition:all 0.2s ease;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--primary-dark);transform:translateY(-1px);box-shadow:0 4px 12px rgba(139,92,246,0.3)}
+.btn:active{transform:translateY(0)}
+
+.link-btn{background:transparent;border:1px solid var(--border);color:var(--text-primary);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;transition:all 0.2s ease; white-space: nowrap;}
+.link-btn:hover{background:rgba(255,255,255,0.05);border-color:var(--primary);color:var(--primary)}
+
+.action-buttons { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+
+.courses-modal,
+.requests-modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.8);
+display:none;
+justify-content:center;
+align-items:center;
+z-index:5000;
+backdrop-filter:blur(5px);
+}
+
+.modal-content{
+background:#1e293b;
+padding:20px;
+border-radius:10px;
+width:300px;
+color:white;
+}
+
+.badge{
+background:#4f46e5;
+padding:4px 10px;
+border-radius:20px;
+font-size:12px;
+}
+
+/* REQUESTS */
+.requests-container{padding:20px}
+
+.card{
+background:#1e293b;
+padding:15px;
+border-radius:10px;
+margin:10px 0;
+transition:.3s;
+}
+
+.card:hover{background:rgba(30,41,59,0.95);border-color:var(--primary)}
+
+.close-btn{
+float:right;
+font-size:28px;
+cursor:pointer;
+}
+
+</style>
+
+
 </head>
 
 <body class="dark-theme">
@@ -41,9 +125,11 @@
             <a href="#" onclick="navigateTo('users')">Users</a>
             <a href="#" onclick="navigateTo('analytics')">Analytics</a>
             <a href="#" onclick="navigateTo('security')">Security</a>
-            <a href="#" onclick="navigateTo('requests')">Requests</a>
-            <a href="#" onclick="navigateTo('ai_chats')">AI Chats</a>
             <a href="#" onclick="navigateTo('logs')">System Logs</a>
+            <a href="#" onclick="navigateTo('courses')">Courses</a>
+            <a href="#" onclick="navigateTo('requests')">Requests</a>
+            <a href="#" id="nav-advisors" onclick="navigateTo('advisors')">Advisors</a>
+            <a href="#" onclick="navigateTo('meeting-slots')">Meeting Slots</a>
             <!-- <a href="#" onclick="navigateTo('settings')">settings</a> -->
         </nav>
         
@@ -97,7 +183,7 @@
                     <h2 style="margin-top:0">Admin Access</h2>
                     <p style="color:var(--muted);margin-bottom:24px">Sign in to manage Edumate platform</p>
                     
-                    <input id="admin-email" class="input" placeholder="admin@edumate.com" style="margin-bottom:12px">
+                    <input id="admin-email" class="input" placeholder="admin@sut.edu.eg" style="margin-bottom:12px">
                     <input id="admin-password" class="input" type="password" placeholder="Password" style="margin-bottom:20px">
                     
                     <!-- Google reCAPTCHA -->
@@ -484,6 +570,30 @@
             </div>
         </section>
 
+        <!-- Courses Page -->
+<section id="courses" class="page">
+<div class="page-header sticky-header">
+    <h2>Courses Management</h2>
+    <button class="btn" onclick="openAddCourse()">+ Add Course</button>
+</div>
+<div class="card" style="padding:15px;overflow-x:auto">
+    <div id="coursesTableWrap"><div style="color:var(--muted);padding:20px;text-align:center">Loading courses…</div></div>
+</div>
+
+</section>
+
+<!-- ================= REQUESTS PAGE ================= -->
+<section id="requests" class="page">
+<div class="page-header">
+    <h2>Summer Course Requests</h2>
+    <button class="btn" onclick="openAddRequest()">+ New Request</button>
+</div>
+<div class="requests-container">
+    <div id="requestsList"><div style="color:var(--muted);padding:20px;text-align:center">Loading requests…</div></div>
+</div>
+
+</section>
+
         <!-- Logs Page -->
         <section id="logs" class="page">
             <div class="page-header">
@@ -495,55 +605,6 @@
                 <div id="system-logs" style="max-height:500px; overflow-y:auto; font-family:monospace; font-size:0.85rem;">
                     <!-- System logs will be loaded here -->
                 </div>
-            </div>
-        </section>
-
-        <!-- Requests Page -->
-        <section id="requests" class="page">
-            <div class="page-header">
-                <h2 style="margin:0">Course & Summer Requests</h2>
-                <button class="btn" style="padding:10px 16px;" onclick="loadRequestsData()">Refresh</button>
-            </div>
-            
-            <div class="card" style="padding:15px; overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse; font-size:0.9rem;">
-                    <thead>
-                        <tr style="border-bottom:2px solid var(--border)">
-                            <th style="text-align:left;padding:8px">Student</th>
-                            <th style="text-align:left;padding:8px">Course</th>
-                            <th style="text-align:left;padding:8px">Date</th>
-                            <th style="text-align:left;padding:8px">Status</th>
-                            <th style="text-align:left;padding:8px">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="requests-table-body">
-                        <!-- Requests will be loaded here -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- AI Chats Page -->
-        <section id="ai_chats" class="page">
-            <div class="page-header">
-                <h2 style="margin:0">AI Advisor Chats</h2>
-                <button class="btn" style="padding:10px 16px;" onclick="loadAiChatsData()">Refresh</button>
-            </div>
-            
-            <div class="card" style="padding:15px; overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse; font-size:0.9rem;">
-                    <thead>
-                        <tr style="border-bottom:2px solid var(--border)">
-                            <th style="text-align:left;padding:8px;width:15%">Student ID</th>
-                            <th style="text-align:left;padding:8px;width:35%">User Message</th>
-                            <th style="text-align:left;padding:8px;width:35%">AI Response</th>
-                            <th style="text-align:left;padding:8px;width:15%">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ai-chats-table-body">
-                        <!-- AI Chats will be loaded here -->
-                    </tbody>
-                </table>
             </div>
         </section>
 
@@ -588,11 +649,459 @@
                 <button class="btn" style="margin-top:10px; padding:8px; font-size:0.9rem;" onclick="showAddAdmin()">Add Admin User</button>
             </div>
         </section>
+
+        <!-- Advisors Page (Admin View) -->
+        <section id="advisors" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Advisors Management</h2>
+                <button class="btn" id="addAdvisorBtn">+ Add Advisor</button>
+            </div>
+            <div id="advisorsTableWrap" class="card" style="padding:0; overflow:hidden">
+                <!-- Loaded via JS -->
+            </div>
+        </section>
+
+        <section id="meeting-slots" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Advisor Meeting Slots</h2>
+                <button class="btn" onclick="submitAdvisorSlot()">Save Slot</button>
+            </div>
+            <div class="card" style="margin-bottom:16px">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+                    <select id="slotAdvisorSelect" class="input"></select>
+                    <select id="slotDay" class="input">
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Sunday">Sunday</option>
+                    </select>
+                    <input id="slotStartTime" class="input" type="time" value="09:00">
+                    <input id="slotLocation" class="input" type="text" placeholder="Room / location">
+                </div>
+            </div>
+            <div id="adminMeetingSlotsWrap" class="card" style="padding:0; overflow:hidden">
+                <div style="color:var(--muted);padding:20px;text-align:center">Loading meeting slots...</div>
+            </div>
+        </section>
+
+        <!-- Advisor Students Page (Advisor View) -->
+        <section id="advisor-students" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">My Students</h2>
+            </div>
+            <div id="advisorStudentsWrap" class="card" style="padding:0; overflow:hidden">
+                <!-- Loaded via JS -->
+            </div>
+        </section>
     </main>
+
+    <!-- Modals moved to body level -->
+    <div class="courses-modal" id="courseModal">
+        <div class="modal-content" style="width:450px">
+            <span class="close-btn" onclick="closeCourseModal()">&times;</span>
+            <h3 id="courseFormTitle">Add Course</h3>
+            <input id="courseCode" class="input" placeholder="Course Code" style="margin-bottom:10px">
+            <input id="courseName" class="input" placeholder="Course Name" style="margin-bottom:10px">
+            <input id="creditHours" class="input" type="number" placeholder="Credit Hours" style="margin-bottom:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                <select id="courseLevel" class="input">
+                    <option value="">Select Level</option>
+                    <option value="1">Level 1</option>
+                    <option value="2">Level 2</option>
+                    <option value="3">Level 3</option>
+                    <option value="4">Level 4</option>
+                </select>
+                <select id="courseSemester" class="input">
+                    <option value="">Select Semester</option>
+                    <option value="Fall">Fall</option>
+                    <option value="Spring">Spring</option>
+                </select>
+            </div>
+            <textarea id="courseDesc" class="input" placeholder="Description (optional)" rows="2" style="margin-bottom:10px"></textarea>
+            
+            <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:4px">Prerequisites</label>
+            <select id="coursePrereqs" class="input" multiple style="height:100px;margin-bottom:10px;padding:5px">
+                <!-- Populated via JS -->
+            </select>
+            <div style="display:flex;gap:8px;margin-top:6px">
+                <button class="btn" style="flex:1" onclick="saveCourse()">Save</button>
+                <button class="link-btn" style="flex:1" onclick="closeCourseModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="courses-modal" id="assignAdvisorModal">
+        <div class="modal-content" style="width:340px">
+            <span class="close-btn" onclick="closeAssignAdvisorModal()">&times;</span>
+            <h3>Assign Student</h3>
+            <p id="assignStudentInfo" style="font-size:0.9rem;color:var(--muted);margin-bottom:15px"></p>
+            <select id="advisorSelect" class="input" style="margin-bottom:15px">
+                <!-- Loaded via JS -->
+            </select>
+            <button class="btn" style="width:100%" onclick="submitAssignment()">Assign Advisor</button>
+        </div>
+    </div>
+
+    <!-- Add/Edit Advisor Modal -->
+    <div class="courses-modal" id="addAdvisorModal">
+        <div class="modal-content" style="width:400px">
+            <span class="close-btn" onclick="closeAddAdvisorModal()">&times;</span>
+            <h3 id="advisorModalTitle">Add New Advisor</h3>
+            <input type="hidden" id="edit-advisor-id">
+            <div style="display:grid;gap:12px;margin-top:15px">
+                <input id="adv-name" class="input" placeholder="Full Name">
+                <input id="adv-email" class="input" placeholder="Email (@sut.edu.eg)">
+                <input id="adv-code" class="input" placeholder="Employee Code (e.g. ADV001)">
+                <input id="adv-dept" class="input" placeholder="Department">
+                <div id="adv-pass-wrap">
+                    <input id="adv-pass" class="input" type="password" placeholder="Initial Password">
+                </div>
+                <button class="btn" id="advisorModalBtn" style="margin-top:10px" onclick="submitAdvisorForm()">Create Advisor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advisor Students Modal -->
+    <div id="advisorStudentsModal" class="courses-modal">
+        <div class="modal-content" style="width:min(90vw, 600px)">
+            <span class="close-btn" onclick="closeAdvisorStudentsModal()">&times;</span>
+            <h3 id="advisorStudentsModalTitle">Advisor's Students</h3>
+            <div id="advisorStudentsModalBody" style="margin-top:20px; max-height:400px; overflow-y:auto">
+                <!-- Loaded via JS -->
+            </div>
+        </div>
+    </div>
+
+    <div class="requests-modal" id="requestAddModal">
+        <div class="modal-content" style="width:340px">
+            <span class="close-btn" onclick="closeRequestAddModal()">&times;</span>
+            <h3>New Course Request</h3>
+            <select id="reqStudent" class="input" style="margin-bottom:10px">
+                <option value="">Select Student</option>
+            </select>
+            <select id="reqCourse" class="input" style="margin-bottom:10px">
+                <option value="">Select Course</option>
+            </select>
+            <button class="btn" style="width:100%" onclick="submitNewRequest()">Submit</button>
+        </div>
+    </div>
+
+    <div id="detailsModal" class="requests-modal">
+        <div class="modal-content" style="width:min(90vw, 500px)">
+            <span class="close-btn" onclick="closeModalReq()">&times;</span>
+            <h2 id="modalTitle"></h2>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Student Academic Record Modal -->
+    <div id="academicRecordModal" class="requests-modal">
+        <div class="modal-content" style="width:min(95vw, 700px); max-height:85vh; overflow-y:auto">
+            <span class="close-btn" onclick="closeAcademicRecordModal()">&times;</span>
+            <h2 id="academicRecordTitle" style="margin-top:0">Academic Record</h2>
+            <div id="academicRecordBody"></div>
+        </div>
+    </div>
     
-    <script src="js/admin_script.js"></script>
-    <script src="js/admin_backend.js"></script>
+    <!-- Scripts -->
+    <script src="js/admin_backend.js?v=3"></script>
     <!-- Google reCAPTCHA -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+    <script>
+
+/* ===== UTILS ===== */
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+/* ===== COURSES (API-connected) ===== */
+
+let cachedCourses = [];
+let editingCourseId = null;
+
+async function loadCourses() {
+    try {
+        cachedCourses = await adminApi('/courses');
+        renderCoursesTable();
+    } catch (e) {
+        document.getElementById('coursesTableWrap').innerHTML =
+            '<div style="color:var(--muted);padding:20px;text-align:center">Failed to load courses.</div>';
+    }
+}
+
+function renderCoursesTable() {
+    const wrap = document.getElementById('coursesTableWrap');
+    if (!cachedCourses.length) {
+        wrap.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">No courses found.</div>';
+        return;
+    }
+    let html = `<table><thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:center;padding:8px;width:100px">Code</th>
+        <th style="text-align:center;padding:8px">Name</th>
+        <th style="text-align:center;padding:8px;width:90px">Level</th>
+        <th style="text-align:center;padding:8px;width:120px">Semester</th>
+        <th style="text-align:center;padding:8px;width:80px">Credits</th>
+        <th style="text-align:center;padding:8px;width:150px">Prerequisites</th>
+        <th style="text-align:center;padding:8px">Description</th>
+        <th style="text-align:center;padding:8px;width:120px">Actions</th>
+    </tr></thead><tbody>`;
+    cachedCourses.forEach(c => {
+        const prereqs = c.prerequisites && c.prerequisites.length 
+            ? c.prerequisites.map(p => `<span class="badge" style="background:#6366f1; margin:2px">${escapeHtml(p.code)}</span>`).join(' ') 
+            : '<span style="color:var(--muted)">None</span>';
+        
+        const descWithSem = (c.semester ? `<strong>[${escapeHtml(c.semester)}]</strong> ` : '') + (c.description || '—');
+
+        html += `<tr>
+            <td><span class="badge" style="background:var(--primary)">${escapeHtml(c.code)}</span></td>
+            <td style="text-align:center;font-weight:600">${escapeHtml(c.name)}</td>
+            <td style="text-align:center"><span class="badge" style="background:#334155">${escapeHtml(c.study_plan_level || c.level || '—')}</span></td>
+            <td style="text-align:center"><span class="badge" style="background:#4b5563">${escapeHtml(c.semester || '—')}</span></td>
+            <td style="text-align:center">${c.credits}</td>
+            <td style="text-align:center">${prereqs}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.description || '—'}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="link-btn" onclick="openEditCourse(${c.id})">Edit</button>
+                    <button class="link-btn" style="border-color:#EF4444;color:#EF4444" onclick="deleteCourse(${c.id})">Delete</button>
+                </div>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+function openAddCourse() {
+    editingCourseId = null;
+    document.getElementById('courseFormTitle').textContent = 'Add Course';
+    document.getElementById('courseCode').value = '';
+    document.getElementById('courseName').value = '';
+    document.getElementById('creditHours').value = '';
+    document.getElementById('courseLevel').value = '';
+    document.getElementById('courseSemester').value = '';
+    document.getElementById('courseDesc').value = '';
+    
+    // Populate prereqs list
+    populatePrereqSelect([]);
+    
+    document.getElementById('courseModal').style.display = 'flex';
+}
+
+function populatePrereqSelect(selectedIds) {
+    const select = document.getElementById('coursePrereqs');
+    if (!select) return;
+    select.innerHTML = '';
+    cachedCourses.forEach(c => {
+        // Don't include current course if editing
+        if (editingCourseId && c.id === editingCourseId) return;
+        
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.code} - ${c.name}`;
+        if (selectedIds.includes(c.id)) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function openEditCourse(id) {
+    const c = cachedCourses.find(x => x.id === id);
+    if (!c) return;
+    editingCourseId = id;
+    document.getElementById('courseFormTitle').textContent = 'Edit Course';
+    document.getElementById('courseCode').value = c.code;
+    document.getElementById('courseName').value = c.name;
+    document.getElementById('creditHours').value = c.credits;
+    document.getElementById('courseLevel').value = c.study_plan_level || c.level || '';
+    document.getElementById('courseSemester').value = c.study_plan_semester || c.semester || '';
+    document.getElementById('courseDesc').value = c.description || '';
+    
+    // Populate prereqs
+    const prereqIds = c.prerequisites ? c.prerequisites.map(p => p.id) : [];
+    populatePrereqSelect(prereqIds);
+    
+    document.getElementById('courseModal').style.display = 'flex';
+}
+
+function closeCourseModal() {
+    document.getElementById('courseModal').style.display = 'none';
+}
+
+async function saveCourse() {
+    const code = document.getElementById('courseCode').value.trim();
+    const name = document.getElementById('courseName').value.trim();
+    const credits = parseInt(document.getElementById('creditHours').value, 10);
+    const level = parseInt(document.getElementById('courseLevel').value, 10);
+    const semester = document.getElementById('courseSemester').value.trim() || null;
+    const description = document.getElementById('courseDesc').value.trim() || null;
+    
+    const prereqSelect = document.getElementById('coursePrereqs');
+    const prerequisite_ids = Array.from(prereqSelect.selectedOptions).map(opt => parseInt(opt.value, 10));
+
+    if (!code || !name || !credits || !level || !semester) { notify('Please fill code, name, credits, level and semester', 'error'); return; }
+    try {
+        const url = editingCourseId ? `/courses/${editingCourseId}` : '/courses';
+        await adminApi(url, {
+            method: editingCourseId ? 'PUT' : 'POST',
+            body: JSON.stringify({ code, name, credits, description, level, semester, prerequisite_ids })
+        });
+        notify('Course saved successfully', 'success');
+        closeCourseModal();
+        await loadCourses();
+    } catch (e) { notify(e.message || 'Failed to save course', 'error'); }
+}
+
+async function deleteCourse(id) {
+    if (!confirm('Delete this course?')) return;
+    try {
+        await adminApi(`/courses/${id}`, { method: 'DELETE' });
+        notify('Course deleted', 'success');
+        await loadCourses();
+    } catch (e) { notify(e.message || 'Failed to delete', 'error'); }
+}
+
+/* ===== REQUESTS (API-connected) ===== */
+
+let cachedRequests = [];
+
+async function loadRequests() {
+    try {
+        cachedRequests = await adminApi('/requests');
+        renderRequests();
+    } catch (e) {
+        console.error('Requests load failed:', e);
+        document.getElementById('requestsList').innerHTML =
+            '<div style="color:var(--muted);padding:20px;text-align:center">Failed to load requests.</div>';
+    }
+}
+
+function groupRequests() {
+    let grouped = {};
+    cachedRequests.forEach(r => {
+        if (!grouped[r.course]) grouped[r.course] = [];
+        grouped[r.course].push(r);
+    });
+    return grouped;
+}
+
+function renderRequests() {
+    const grouped = groupRequests();
+    const keys = Object.keys(grouped);
+    if (!keys.length) {
+        document.getElementById('requestsList').innerHTML =
+            '<div style="color:var(--muted);padding:20px;text-align:center">No requests found.</div>';
+        return;
+    }
+    let html = '';
+    keys.forEach(course => {
+        const escapedCourse = escapeHtml(course);
+        html += `<div class="card" style="cursor:pointer" onclick="viewDetails(this.getAttribute('data-course'))" data-course="${escapedCourse}">
+            <h3>${escapedCourse}</h3>
+            <p style="color:var(--muted)">Total Requests: ${grouped[course].length}</p>
+        </div>`;
+    });
+    document.getElementById('requestsList').innerHTML = html;
+}
+
+function viewDetails(course) {
+    const grouped = groupRequests();
+    const items = grouped[course] || [];
+    document.getElementById('modalTitle').innerText = course + ' Requests';
+    document.getElementById('modalBody').innerHTML =
+        '<ul style="list-style:none;padding:0">' +
+        items.map(r => `<li style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span>${escapeHtml(r.student)}</span>
+            <button class="link-btn" style="padding:2px 8px;border-color:#EF4444;color:#EF4444;font-size:.8rem" onclick="deleteRequest(${r.id})">Remove</button>
+        </li>`).join('') + '</ul>';
+    document.getElementById('detailsModal').style.display = 'flex';
+}
+
+function closeModalReq() { document.getElementById('detailsModal').style.display = 'none'; }
+
+function openAddRequest() { 
+    populateRequestDropdowns();
+    document.getElementById('requestAddModal').style.display = 'flex'; 
+}
+
+async function populateRequestDropdowns() {
+    const studentSelect = document.getElementById('reqStudent');
+    const courseSelect = document.getElementById('reqCourse');
+    
+    studentSelect.innerHTML = '<option value="">Loading students...</option>';
+    courseSelect.innerHTML = '<option value="">Loading courses...</option>';
+    
+    try {
+        // Fetch students and courses in parallel
+        const [users, courses] = await Promise.all([
+            adminApi('/admin/users'),
+            adminApi('/courses')
+        ]);
+        
+        studentSelect.innerHTML = '<option value="">Select Student</option>';
+        users.forEach(u => {
+            const opt = document.createElement('option');
+            // Use full name if available, otherwise email or student code
+            const name = u.full_name || u.name || u.student_code || u.email;
+            opt.value = name; 
+            opt.textContent = `${name} (${u.student_code || u.email})`;
+            studentSelect.appendChild(opt);
+        });
+        
+        courseSelect.innerHTML = '<option value="">Select Course</option>';
+        courses.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.name;
+            opt.textContent = `${c.code} - ${c.name}`;
+            courseSelect.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Failed to populate dropdowns:', e);
+        studentSelect.innerHTML = '<option value="">Error loading students</option>';
+        courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+    }
+}
+
+function closeRequestAddModal() { document.getElementById('requestAddModal').style.display = 'none'; }
+
+async function submitNewRequest() {
+    const student = document.getElementById('reqStudent').value.trim();
+    const course = document.getElementById('reqCourse').value.trim();
+    if (!student || !course) { notify('Fill both fields', 'error'); return; }
+    try {
+        await adminApi('/requests', {
+            method: 'POST',
+            body: JSON.stringify({ student, course })
+        });
+        notify('Request submitted', 'success');
+        closeRequestAddModal();
+        document.getElementById('reqStudent').value = '';
+        document.getElementById('reqCourse').value = '';
+        await loadRequests();
+    } catch (e) { notify(e.message || 'Failed to submit', 'error'); }
+}
+
+async function deleteRequest(id) {
+    try {
+        await adminApi(`/requests/${id}`, { method: 'DELETE' });
+        notify('Request removed', 'success');
+        closeModalReq();
+        await loadRequests();
+    } catch (e) { notify(e.message || 'Failed to delete', 'error'); }
+}
+
+</script>
+
+
+
+    <script src="js/admin_script.js?v=3"></script>
 </body>
 </html>
+

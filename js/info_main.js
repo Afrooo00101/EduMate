@@ -12,8 +12,7 @@ function showLogin() {
 // Register function removed - hidden from UI
 // Keeping function definition but disabled
 function showRegister() {
-    hideAllPages();
-    document.getElementById('register').classList.add('active');
+    Toast.error('Registration is currently disabled. Please use your institutional email.');
 }
 
 function showForgotPassword() {
@@ -67,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Hide any register links/buttons in the UI
-    // hideRegisterElements();
+    hideRegisterElements();
 });
 
 // Function to hide register elements from UI

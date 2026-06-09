@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Edumate — Empower Your Future</title>
+    <title>Edumate â€” Empower Your Future</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="Edumate_logo.png">
     
@@ -34,7 +34,7 @@
         </div>
 
         <!-- <div class="logo">
-            <button id="sidebar-toggle" class="btn-icon">☰</button>
+            <button id="sidebar-toggle" class="btn-icon">â˜°</button>
             <a href="#" class="logo" onclick="navigateTo('dashboard')"><span>EduMate</span></a>
         </div> -->
         
@@ -45,9 +45,14 @@
             <a href="#" onclick="navigateTo('courses')">Courses</a>
             <a href="#" onclick="navigateTo('planning')">Planning</a>
             <a href="#" onclick="navigateTo('xai')">AI Chat</a>
+            <a href="#" onclick="navigateTo('advisor-chat')" id="student-chat-nav-link" style="position:relative">
+                Advisor Chat
+                <span id="student-chat-badge" style="display:none;position:absolute;top:-4px;right:-8px;background:#ef4444;color:white;border-radius:50%;width:16px;height:16px;font-size:0.65rem;font-weight:700;align-items:center;justify-content:center"></span>
+            </a>
+            <a href="#" onclick="navigateTo('advisor-meetups'); setTimeout(function(){ if (window.initializeAdvisorMeetupsPage) window.initializeAdvisorMeetupsPage(); }, 250); return false;">Meetups</a>
         </nav>
         <div class="controls">
-            <button id="theme-toggle" class="btn-icon">🌙</button>
+            <button id="theme-toggle" class="btn-icon">ðŸŒ™</button>
             <button id="signout-button" class="btn-icon" onclick="signOut()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="log-out">
             <path fill="#ff3838" fill-rule="evenodd" d="M151.059,222.739h243.925v-34.613c0-3.083,1.658-5.722,4.435-7.061,2.777-1.339,5.874-.993,8.287,.928l85.347,67.919c1.933,1.538,2.958,3.664,2.958,6.134s-1.025,4.596-2.958,6.134l-85.347,67.919c-2.412,1.92-5.51,2.267-8.287,.927-2.777-1.339-4.435-3.978-4.435-7.061v-34.613H151.059c-6.338,0-11.524-5.186-11.524-11.524v-43.564c0-6.338,5.186-11.524,11.524-11.524Z"></path>
             <path fill="#ff3838" fill-rule="evenodd" d="M327.17,16.045H46.314c-16.667,0-30.305,13.637-30.305,30.304V465.74c0,16.667,13.637,30.304,30.305,30.304H327.17c16.667,0,30.304-13.637,30.304-30.304v-83.267c0-6.611-5.392-12.003-12.003-12.003h-42.607c-6.611,0-12.003,5.392-12.003,12.003v46.959H82.622V82.657h208.241v46.96c0,6.61,5.392,12.003,12.003,12.003h42.607c6.611,0,12.003-5.392,12.003-12.003V46.349c0-16.667-13.637-30.304-30.304-30.304Z"></path>
@@ -57,7 +62,7 @@
     </header>
 
     <!-- Sidebar -->
-    <nav id="sidebar" class="sidebar">
+    <!-- <nav id="sidebar" class="sidebar">
         <div class="sidebar-profile" onclick="navigateTo('profile')">
             <img id="profile-pic" class="profile-pic" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F036%2F885%2F313%2Foriginal%2Fblue-profile-icon-free-png.png&f=1&nofb=1&ipt=835f4c686ca5c7c40c36d1d27d110a772754ba33d4d707b84606d4cf250ecde1">
             <div>
@@ -67,19 +72,19 @@
         </div>
         
         <div class="nav-item" onclick="navigateTo('resume')">
-            <span>📄</span> <span class="nav-item-text">Resume</span>
+            <span>ðŸ“„</span> <span class="nav-item-text">Resume</span>
         </div>
         <div class="nav-item" onclick="navigateTo('Internships')">
-            <span>💼</span> <span class="nav-item-text">Internships</span>
+            <span>ðŸ’¼</span> <span class="nav-item-text">Internships</span>
         </div>
 
         <div class="nav-item" onclick="navigateTo('courses')">
-            <span>📚</span> <span class="nav-item-text">Courses</span>
+            <span>ðŸ“š</span> <span class="nav-item-text">Courses</span>
         </div>
         <div class="nav-item" onclick="navigateTo('xai')">
-            <span>🤖</span> <span class="nav-item-text">AI Chat</span>
+            <span>ðŸ¤–</span> <span class="nav-item-text">AI Chat</span>
         </div>
-    </nav>
+    </nav> -->
 
     <!-- Main Content -->
     <main id="mainContent" class="main-content">
@@ -108,7 +113,7 @@
                 <!-- Get Started Button -->
                 <button class="btn" onclick="navigateTo('login')" 
                         style="padding:15px 40px;font-size:1.2rem; border-radius: 50px; margin-top: 20px;">
-                    🚀 Get Started
+                    ðŸš€ Get Started
                 </button>
             </div>
         </section>
@@ -230,7 +235,7 @@
                 <h2 style="margin:0">Dashboard</h2>
                 <div style="display:flex;align-items:center;gap:15px">
                     <span id="user-name" style="font-weight:600;color:var(--primary)"></span>
-                    <button class="btn-icon" onclick="refreshDashboard()" title="Refresh">🔄</button>
+                    <button class="btn-icon" onclick="refreshDashboard()" title="Refresh">ðŸ”„</button>
                 </div>
             </div>
             
@@ -238,7 +243,7 @@
             <div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:white">
                 <div style="display:flex;justify-content:space-between;align-items:center">
                     <div>
-                        <h3 style="margin:0;color:white">Welcome back! 👋</h3>
+                        <h3 style="margin:0;color:white">Welcome back! ðŸ‘‹</h3>
                         <p style="margin:5px 0 0;opacity:0.9">Here's your career progress today</p>
                     </div>
                     <div id="dashboard-date" style="font-weight:600"></div>
@@ -248,21 +253,21 @@
             <!-- Stats Grid -->
             <div class="dashboard-grid" style="margin-bottom:20px">
                 <div class="card stat-card" style="text-align:center">
-                    <div style="font-size:2rem;margin-bottom:10px">🎯</div>
+                    <div style="font-size:2rem;margin-bottom:10px">ðŸŽ¯</div>
                     <h3 style="margin:5px 0">Career Score</h3>
                     <div id="career-score" style="font-size:2rem;font-weight:800;color:var(--primary)">85</div>
                     <div style="font-size:0.9rem;color:var(--muted)">Out of 100</div>
                 </div>
                 
                 <div class="card stat-card" style="text-align:center">
-                    <div style="font-size:2rem;margin-bottom:10px">📈</div>
+                    <div style="font-size:2rem;margin-bottom:10px">ðŸ“ˆ</div>
                     <h3 style="margin:5px 0">Skill Growth</h3>
                     <div id="skill-growth" style="font-size:2rem;font-weight:800;color:#10B981">+12%</div>
                     <div style="font-size:0.9rem;color:var(--muted)">This month</div>
                 </div>
                 
                 <div class="card stat-card" style="text-align:center">
-                    <div style="font-size:2rem;margin-bottom:10px">⏱️</div>
+                    <div style="font-size:2rem;margin-bottom:10px">â±ï¸</div>
                     <h3 style="margin:5px 0">Learning Time</h3>
                     <div id="learning-time" style="font-size:2rem;font-weight:800;color:#F59E0B">15h</div>
                     <div style="font-size:0.9rem;color:var(--muted)">This week</div>
@@ -272,33 +277,33 @@
             <!-- Quick Actions & Recent Activity -->
             <div class="dashboard-grid" style="grid-template-columns:1fr 1fr;margin-bottom:20px">
                 <div class="card">
-                    <h3 style="margin-top:0">🚀 Quick Actions</h3>
+                    <h3 style="margin-top:0">ðŸš€ Quick Actions</h3>
                     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
                         <button class="quick-action-btn" onclick="navigateTo('resume')">
-                            <span style="font-size:1.5rem">📄</span>
+                            <span style="font-size:1.5rem">ðŸ“„</span>
                             <div>Update Resume</div>
                         </button>
                         <button class="quick-action-btn" onclick="navigateTo('Internships')">
-                            <span style="font-size:1.5rem">💼</span>
+                            <span style="font-size:1.5rem">ðŸ’¼</span>
                             <div>Find Internships</div>
                         </button>
                         <button class="quick-action-btn" onclick="navigateTo('planning')">
-                            <span style="font-size:1.5rem">📅</span>
+                            <span style="font-size:1.5rem">ðŸ“…</span>
                             <div>My Planning</div>
                         </button>
                         <button class="quick-action-btn" onclick="toggleAIPopup()">
-                            <span style="font-size:1.5rem">🤖</span>
+                            <span style="font-size:1.5rem">ðŸ¤–</span>
                             <div>AI Assistant</div>
                         </button>
                     </div>
                 </div>
                 
                 <div class="card">
-                    <h3 style="margin-top:0">📅 Recent Activity</h3>
+                    <h3 style="margin-top:0">ðŸ“… Recent Activity</h3>
                     <div id="recent-activity" style="max-height:200px;overflow-y:auto">
                         <div class="activity-item">
                             <div style="display:flex;align-items:center;gap:10px">
-                                <span style="color:#10B981">✓</span>
+                                <span style="color:#10B981">âœ“</span>
                                 <div>
                                     <div style="font-weight:600">Resume Updated</div>
                                     <div style="font-size:0.85rem;color:var(--muted)">2 hours ago</div>
@@ -307,7 +312,7 @@
                         </div>
                         <div class="activity-item">
                             <div style="display:flex;align-items:center;gap:10px">
-                                <span style="color:#F59E0B">🎓</span>
+                                <span style="color:#F59E0B">ðŸŽ“</span>
                                 <div>
                                     <div style="font-weight:600">Applied to Computer Science</div>
                                     <div style="font-size:0.85rem;color:var(--muted)">Yesterday</div>
@@ -316,7 +321,7 @@
                         </div>
                         <div class="activity-item">
                             <div style="display:flex;align-items:center;gap:10px">
-                                <span style="color:#8B5CF6">🤖</span>
+                                <span style="color:#8B5CF6">ðŸ¤–</span>
                                 <div>
                                     <div style="font-weight:600">Chatted with AI Assistant</div>
                                     <div style="font-size:0.85rem;color:var(--muted)">2 days ago</div>
@@ -329,7 +334,7 @@
 
             <!-- Learning progress -->
             <div class="card" style="text-align:center">
-                <h3>📚 Learning</h3>
+                <h3>ðŸ“š Learning</h3>
                 <p style="color:var(--muted)">Continue your courses</p>
                 <div class="learning-progress" style="font-size:2rem;font-weight:800;color:#10B981">65%</div>
                 <button class="btn" onclick="navigateTo('courses')" style="margin-top:10px;width:100%">View Courses</button>
@@ -374,8 +379,8 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
                 <button class="btn" onclick="showResumeForm()">Edit Resume Data</button>
                 <button class="btn" onclick="generateResumePreview()">Preview Resume</button>
-                <button class="btn" onclick="checkATSCompatibility()">Check ATS Score</button>
-                <div id="ats-feedback" class="card" style="margin-top:15px;display:none"></div>
+                <button class="btn" style="grid-column:1 / -1" onclick="checkATSCompatibility()">Check ATS Score</button>
+                <div id="ats-feedback" class="card" style="grid-column:1 / -1;margin-top:0;display:none"></div>
             </div>
 
             <!-- Resume template-->
@@ -521,7 +526,7 @@
                     <div class="experience-entry" style="border:1px dashed #ccc;padding:12px;border-radius:8px;margin-bottom:10px">
                         <input placeholder="Job Title" class="input" style="margin-bottom:8px">
                         <input placeholder="Company" class="input" style="margin-bottom:8px">
-                        <input placeholder="Dates (e.g. Jan 2023 – Present)" class="input" style="margin-bottom:8px">
+                        <input placeholder="Dates (e.g. Jan 2023 â€“ Present)" class="input" style="margin-bottom:8px">
                         <textarea placeholder="Responsibilities & Achievements" class="input" rows="3"></textarea>
                     </div>
                 </div>
@@ -543,7 +548,6 @@
             <div id="resume-preview" class="card" style="margin-top:20px;overflow:hidden">
                 <div style="text-align:center;padding:10px;background:#f1f5f9">
                     <button class="btn" onclick="downloadResumePDF()">Download PDF</button>
-                    <button class="link-btn" onclick="checkATSCompatibility()">Check ATS Score</button>
                 </div>
                 <div id="resume-content" style="padding:40px;background:white;min-height:800px;font-family:Arial,sans-serif">
                     <!-- Resume will be injected here -->
@@ -594,13 +598,13 @@
                         <input id="profile-skills-input" class="input" placeholder="e.g., Python, JavaScript, React">
                     </div>
                 </div>
-                <button class="btn" style="margin-top:20px;width:100%" onclick="saveProfileEdits()">💾 Save Changes</button>
+                <button class="btn" style="margin-top:20px;width:100%" onclick="saveProfileEdits()">ðŸ’¾ Save Changes</button>
             </div>
         </section>
 
         <!-- AI Chat Page -->
         <section id="xai" class="page">
-            <h2>🤖 AI Career Assistant</h2>
+            <h2>ðŸ¤– AI Career Assistant</h2>
             <br>
             <div class="card" style="max-width:95 vw;margin:0 auto">
                 <div id="ai-chat-output" class="chat-output chat-thread" style="min-height:200px;border-bottom:1px solid var(--border);padding-bottom:15px;margin-bottom:15px">
@@ -621,28 +625,34 @@
             </div>
         </section>
 
-    <!-- ===== ENHANCED PLANNING PAGE ===== -->
+        <!-- ===== ENHANCED PLANNING PAGE ===== -->
         <section id="planning" class="page">
             <div class="planner-container">
                 <!-- Top header with career path -->
                 <div class="hero-row">
                     <div class="greet">
                         <i class="fas fa-compass"></i>
-                        <h1>EduPath · planning your path</h1>
+                        <h1>EduPath Â· planning your path</h1>
                     </div>
                     <div class="career-tag">
                         <span><i class="fas fa-route" style="margin-right: 6px;"></i> current path</span>
-                        <div class="career-badge" id="career-badge-display">🛡️ Cyber Security</div>
+                        <div class="career-badge" id="career-badge-display">ðŸ›¡ï¸ Academic Path</div>
                     </div>
                 </div>
 
                 <!-- Plan / Preview Toggle -->
                 <div class="plan-toggle-bar">
                     <button class="toggle-btn active" onclick="switchPlanningView('plan')">
-                        <i class="fas fa-edit"></i> Plan Semesters
+                        <i class="fas fa-calendar-alt"></i> My Study Plan
                     </button>
                     <button class="toggle-btn" onclick="switchPlanningView('preview')">
-                        <i class="fas fa-road"></i> Career Path Preview
+                        <i class="fas fa-road"></i> Career Path
+                    </button>
+                    <button class="toggle-btn" onclick="switchPlanningView('summer')">
+                        <i class="fas fa-sun"></i> Summer Requests
+                    </button>
+                    <button class="toggle-btn" onclick="switchPlanningView('academic-plan')">
+                        <i class="fas fa-file-invoice"></i> Academic Plan
                     </button>
                 </div>
 
@@ -682,7 +692,7 @@
                 <div id="planning-plan-view" class="planning-view active">
                     <!-- Main planning grid -->
                     <div class="plan-grid">
-                        <!-- Left side – semesters with credit hours -->
+                        <!-- Left side â€“ semesters with credit hours -->
                         <div class="semester-section">
                             <div class="section-header">
                                 <h2><i class="fas fa-layer-group"></i> academic semesters</h2>
@@ -701,6 +711,7 @@
                                         <div class="form-group">
                                             <label>Semester Type:</label>
                                             <select id="semester-type" class="input" onchange="loadSubjectsForSemester()">
+                                                <option value="all">All Subjects (Database)</option>
                                                 <option value="foundation">Foundation Semester</option>
                                                 <option value="core">Core & Data Semester</option>
                                                 <option value="intelligent">Intelligent Systems</option>
@@ -749,49 +760,87 @@
                             
                             <!-- Add Subject Modal -->
                             <div id="add-subject-modal" class="subjects-modal">
-                                <div class="modal-content">
+                                <div class="modal-content" style="max-width:580px; max-height:90vh; overflow-y:auto;">
                                     <div class="modal-header">
                                         <h2><i class="fas fa-plus-circle"></i> Add Subject to Semester</h2>
                                         <button onclick="closeAddSubjectModal()" class="modal-close">&times;</button>
                                     </div>
                                     
                                     <div class="modal-body">
+                                        <!-- Hidden field to store selected course id -->
+                                        <input type="hidden" id="new-subject-id">
+
+                                        <!-- Search & pick from official courses -->
                                         <div class="form-group">
-                                            <label>Subject Name:</label>
-                                            <input type="text" id="new-subject-name" class="input" placeholder="e.g., Advanced Algorithms">
+                                            <label style="font-weight:600; margin-bottom:6px; display:block;">Search Course:</label>
+                                            <input type="text" id="add-subject-search" class="input"
+                                                   placeholder="Type course name or code..."
+                                                   oninput="filterAddSubjectList(this.value)"
+                                                   autocomplete="off">
                                         </div>
-                                        
-                                        <div class="form-group">
-                                            <label>Credit Hours:</label>
-                                            <select id="new-subject-credits" class="input">
-                                                <option value="1">1 credit</option>
-                                                <option value="2">2 credits</option>
-                                                <option value="3" selected>3 credits</option>
-                                                <option value="4">4 credits</option>
-                                                <option value="5">5 credits</option>
-                                                <option value="6">6 credits</option>
+
+                                        <div id="add-subjects-list"
+                                             style="max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; margin-bottom:12px; padding:4px;">
+                                            <div style="text-align:center; padding:20px; color:var(--muted);">
+                                                <i class="fas fa-spinner fa-spin"></i> Loading courses...
+                                            </div>
+                                        </div>
+
+                                        <!-- Selected course display -->
+                                        <div id="selected-course-display" style="display:none; background:rgba(139,92,246,0.12); border:1px solid var(--primary); border-radius:10px; padding:10px 14px; margin-bottom:12px;">
+                                            <div style="font-size:0.78rem; color:var(--muted); margin-bottom:2px;">Selected Course:</div>
+                                            <div id="selected-course-name" style="font-weight:700; color:var(--primary);"></div>
+                                        </div>
+
+                                        <!-- Status -->
+                                        <div class="form-group" style="margin-top:10px;">
+                                            <label style="font-weight:600; margin-bottom:6px; display:block;">Status:</label>
+                                            <select id="new-subject-status" class="input" onchange="toggleGradeInput(this.value)">
+                                                <option value="planned" selected>ðŸ“‹ Planned (future course)</option>
+                                                <option value="enrolled">ðŸ“– Enrolled / In Progress</option>
+                                                <option value="completed">âœ… Completed</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Grade (only when Completed) -->
+                                        <div class="form-group" id="grade-input-group" style="display:none; margin-top:10px;">
+                                            <label style="font-weight:600; margin-bottom:6px; display:block;">Grade:</label>
+                                            <select id="new-subject-grade" class="input">
+                                                <option value="">â€” Select Grade â€”</option>
+                                                <option value="A">A</option>
+                                                <option value="A-">A-</option>
+                                                <option value="B+">B+</option>
+                                                <option value="B">B</option>
+                                                <option value="B-">B-</option>
+                                                <option value="C+">C+</option>
+                                                <option value="C">C</option>
+                                                <option value="C-">C-</option>
+                                                <option value="D">D</option>
+                                                <option value="F">F</option>
                                             </select>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="modal-footer">
                                         <button onclick="closeAddSubjectModal()" class="link-btn">Cancel</button>
-                                        <button onclick="addSubjectToSemester()" class="btn">
+                                        <button id="add-subject-submit-btn" onclick="addSubjectToSemester()" class="btn">
                                             <i class="fas fa-plus-circle"></i> Add Subject
                                         </button>
                                     </div>
                                 </div>
                             </div>
+
+                            
                             
                             <div class="semester-cards" id="semester-cards-container">
                                 <!-- Semester cards populated by JS -->
                             </div>
                             <div id="semester-counter" class="semester-counter">
-                                <i class="fas-regular fa-calendar-plus"></i> <span id="counter-text">3 semesters planned</span>
+                                <i class="far fa-calendar-plus"></i> <span id="counter-text">3 semesters planned</span>
                             </div>
                         </div>
 
-                        <!-- Right panel – career guidance -->
+                        <!-- Right panel â€“ career guidance -->
                         <div class="right-panel">
                             <div class="path-card">
                                 <h4><i class="fas fa-map-signs"></i> career track</h4>
@@ -802,20 +851,11 @@
                                 </div>
                             </div>
                             
-                            <!-- Summer Course Request Section -->
-                            <div class="summer-request-section" id="summer-request-section">
-                                <div class="summer-request-header">
-                                    <h3><i class="fas fa-sun"></i> Summer Course Request</h3>
-                                    <button class="summer-request-btn" onclick="viewAllSummerCourses()">
-                                        <i class="fas fa-list"></i> View All
-                                    </button>
-                                </div>
-                                <p style="font-size:0.85rem;color:#92400e;margin-bottom:0.8rem;">
-                                    Based on your progress, consider these summer courses:
-                                </p>
-                                <div class="summer-course-list" id="summer-course-list">
-                                    <!-- Populated by JS -->
-                                </div>
+                            <!-- Summer Request Quick Button -->
+                            <div style="margin-top:12px;">
+                                <button class="btn" style="width:100%;" onclick="switchPlanningView('summer')">
+                                    <i class="fas fa-sun"></i> View Summer Requests
+                                </button>
                             </div>
                             
                             <div class="academic-tip">
@@ -919,69 +959,113 @@
                     </div>
                 </div>
 
-                <!-- ========== PREVIEW VIEW (Career Path Timeline) ========== -->
+                <!-- ========== PREVIEW VIEW (Career Path Journey - Screenshot 3) ========== -->
                 <div id="planning-preview-view" class="planning-view">
-                    <!-- Career Path Timeline -->
-                    <div class="career-path-container">
-                        <div class="career-path-header">
-                            <h2><i class="fas fa-road"></i> Your Career Path: <span id="preview-career-name">Cyber Security</span></h2>
-                            <div class="path-legend">
-                                <div class="legend-item"><span class="legend-dot completed"></span> Completed</div>
-                                <div class="legend-item"><span class="legend-dot current"></span> Current</div>
-                                <div class="legend-item"><span class="legend-dot upcoming"></span> Upcoming</div>
-                                <div class="legend-item"><span class="legend-dot summer"></span> Summer</div>
+                    <div class="career-journey-header">
+                        <h2><i class="fas fa-map-marked-alt" style="color:#8B5CF6"></i> Your Career Journey</h2>
+                        <p>Track your progress from first semester to graduation</p>
+                    </div>
+
+                    <!-- Statistics Cards -->
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-icon info"><i class="fas fa-graduation-cap"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="path-total-courses">38</div>
+                                <div class="stat-label">total courses</div>
                             </div>
                         </div>
-
-                        <!-- Timeline -->
-                        <div class="timeline-wrapper">
-                            <div class="timeline-line" id="career-timeline">
-                                <!-- Populated by JS -->
+                        <div class="stat-box">
+                            <div class="stat-icon success"><i class="fas fa-check-circle"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="path-completed-courses">2</div>
+                                <div class="stat-label">completed</div>
                             </div>
                         </div>
-
-                        <!-- Summary Cards -->
-                        <div class="path-summary-row" id="path-summary-row">
-                            <!-- Populated by JS -->
+                        <div class="stat-box">
+                            <div class="stat-icon info"><i class="fas fa-chart-line"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="path-progress-percent">5.3%</div>
+                                <div class="stat-label">progress</div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Advisor Chat Panel -->
-                    <div class="advisor-chat-panel" id="advisor-chat-panel">
-                        <div class="advisor-chat-header">
-                            <span class="online-dot"></span>
-                            <h3><i class="fas fa-robot"></i> AI Career Advisor</h3>
-                            <span style="margin-left:auto;font-size:0.8rem;opacity:0.8;">Online</span>
+                    <!-- Main Progress Bar -->
+                    <div class="career-progress-bar-container">
+                        <div class="progress-info">
+                            <div class="major-name"><i class="fas fa-book"></i> <span id="preview-major-name">Cyber Security</span></div>
+                            <div class="gpa-badge">GPA: <span id="preview-gpa-val">3.42</span></div>
+                            <div class="done-count"><span id="preview-done-count">2 / 38</span> courses done</div>
                         </div>
-                        <div class="advisor-chat-messages" id="advisor-chat-messages">
-                            <div class="advisor-message ai">
-                                <div class="advisor-avatar ai-avatar">🤖</div>
-                                <div class="advisor-bubble">
-                                    Hello! I'm your AI Academic Advisor. I can help you with:
-                                    <br>• Course recommendations for your career path
-                                    <br>• Summer course planning
-                                    <br>• Prerequisite checks
-                                    <br>• Graduation timeline questions
-                                    <br><br>How can I help you today?
-                                </div>
-                            </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="preview-main-progress-bar" style="width: 5.3%;"></div>
                         </div>
-                        <div class="advisor-suggestions" id="advisor-suggestions">
-                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('What courses should I take next semester?')">📚 Next semester courses</span>
-                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('Are there any summer courses I should consider?')">☀️ Summer courses</span>
-                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('What is my graduation timeline?')">🎓 Graduation timeline</span>
-                            <span class="suggestion-chip" onclick="sendAdvisorQuickMessage('What are the prerequisites I still need?')">📋 Prerequisites</span>
+                        <div class="progress-label-bottom">
+                            <span id="preview-progress-text">5.3% Complete</span>
                         </div>
-                        <div class="advisor-chat-input-area">
-                            <input type="text" id="advisor-chat-input" placeholder="Ask your advisor anything..." 
-                                onkeypress="if(event.key==='Enter') sendAdvisorMessage()">
-                            <button onclick="sendAdvisorMessage()">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
+                    </div>
+
+                    <!-- Semester Timeline (Vertical) -->
+                    <div id="career-timeline" class="timeline-vertical">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- ========== SUMMER REQUESTS VIEW (Screenshot 1) ========== -->
+                <div id="planning-summer-view" class="planning-view">
+                    <div class="summer-requests-header">
+                        <div class="header-info">
+                            <h2><i class="fas fa-sun" style="color: #f59e0b;"></i> Summer Course Requests</h2>
+                            <p style="color: #94a3b8;">Request to take courses during summer semester</p>
+                        </div>
+                        <button class="new-request-btn" onclick="showSummerRequestModal()">
+                            <i class="fas fa-plus-circle"></i> New Request
+                        </button>
+                    </div>
+
+                    <div class="requests-container">
+                        <h3>Your Requests</h3>
+                        <div id="summer-requests-list" class="requests-list">
+                            <!-- Populated by JS -->
                         </div>
                     </div>
                 </div>
 
+                <!-- ========== ACADEMIC PLAN VIEW (Grouped by Semester) ========== -->
+                <div id="planning-academic-plan-view" class="planning-view">
+                    <div class="curriculum-header">
+                        <div>
+                            <h2 style="margin:0" id="academic-curriculum-title"><i class="fas fa-file-invoice" style="color: var(--primary); margin-right:8px;"></i>Academic Curriculum</h2>
+                            <p style="color:var(--muted);margin:6px 0 0">Academic curriculum overview â€” all 8 semesters</p>
+                        </div>
+                        <div class="curriculum-toggle" id="curriculum-toggle" style="display: none;">
+                            <button class="curriculum-toggle-btn active" onclick="switchCurriculumMajor('Computer Science')">
+                                <i class="fas fa-code"></i> CS
+                            </button>
+                            <button class="curriculum-toggle-btn" onclick="switchCurriculumMajor('Cyber Security')">
+                                <i class="fas fa-shield-alt"></i> Cyber
+                            </button>
+                            <button class="curriculum-toggle-btn" onclick="switchCurriculumMajor('Data Science')">
+                                <i class="fas fa-chart-bar"></i> DS
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="curriculum-grid" class="curriculum-grid">
+                        <div style="text-align:center;padding:60px 20px;color:var(--muted)">
+                            <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;margin-bottom:12px;display:block"></i>
+                            Loading academic planâ€¦
+                        </div>
+                    </div>
+
+                    <div class="curriculum-legend" style="margin-top:20px; display:flex; gap:20px; flex-wrap:wrap; justify-content:center; background:rgba(255,255,255,0.02); padding:15px; border-radius:12px; border:1px solid var(--border);">
+                        <span class="legend-item"><span class="legend-dot" style="background:#2e7d32; border:1px solid #4caf50; width:14px; height:14px; border-radius:4px; display:inline-block; margin-right:6px;"></span> Selected Course</span>
+                        <span class="legend-item"><span class="legend-dot" style="background:#0277bd; border:1px solid #03a9f4; width:14px; height:14px; border-radius:4px; display:inline-block; margin-right:6px;"></span> Direct Prerequisite</span>
+                        <span class="legend-item"><span class="legend-dot" style="background:#6a1b9a; border:1px solid #ab47bc; width:14px; height:14px; border-radius:4px; display:inline-block; margin-right:6px;"></span> Indirect Prerequisite</span>
+                        <span class="legend-item"><span class="legend-dot" style="background:#f9a825; border:1px solid #fdd835; width:14px; height:14px; border-radius:4px; display:inline-block; margin-right:6px;"></span> Next Course</span>
+                    </div>
+                </div>
                 <!-- Footer identity -->
                 <div class="footer-credit"> 
                     <span><i class="fas fa-copyright"></i> 2024 EduPath. All rights reserved.</span>
@@ -993,7 +1077,7 @@
         <!-- Courses Page -->
         <section id="courses" class="page">
             <div class="page-header">
-                <h2 style="margin:0">🎓 Courses & Learning</h2>
+                <h2 style="margin:0">ðŸŽ“ Courses & Learning</h2>
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                     <div style="display:flex;gap:10px;align-items:center;">
                         <input type="text" 
@@ -1002,21 +1086,21 @@
                             placeholder="Search for courses..." 
                             style="min-width:300px;padding:10px 15px;"
                             onkeypress="if(event.key==='Enter') searchCourses()">
-                        <button class="btn" onclick="searchCourses()" style="white-space:nowrap;">🔍 Search</button>
+                        <button class="btn" onclick="searchCourses()" style="white-space:nowrap;">ðŸ” Search</button>
                     </div>
                     <button class="btn" onclick="viewSavedCourses()" style="white-space:nowrap; background:var(--success);">
-                        📚 View Saved Courses
+                        ðŸ“š View Saved Courses
                     </button>
                 </div>
             </div>
             
             <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-                <button class="link-btn" onclick="quickSearch('programming')">💻 Programming</button>
-                <button class="link-btn" onclick="quickSearch('data science')">📊 Data Science</button>
-                <button class="link-btn" onclick="quickSearch('business')">📈 Business</button>
-                <button class="link-btn" onclick="quickSearch('marketing')">🎯 Marketing</button>
-                <button class="link-btn" onclick="quickSearch('design')">🎨 Design</button>
-                <button class="link-btn" onclick="quickSearch('language')">🗣️ Languages</button>
+                <button class="link-btn" onclick="quickSearch('programming')">ðŸ’» Programming</button>
+                <button class="link-btn" onclick="quickSearch('data science')">ðŸ“Š Data Science</button>
+                <button class="link-btn" onclick="quickSearch('business')">ðŸ“ˆ Business</button>
+                <button class="link-btn" onclick="quickSearch('marketing')">ðŸŽ¯ Marketing</button>
+                <button class="link-btn" onclick="quickSearch('design')">ðŸŽ¨ Design</button>
+                <button class="link-btn" onclick="quickSearch('language')">ðŸ—£ï¸ Languages</button>
             </div>
             
             <div id="search-info" style="display:none; margin-bottom:20px;"></div>
@@ -1026,17 +1110,129 @@
             </div>
             
             <div id="pagination-controls" style="display:none; justify-content:center; gap:10px; margin-top:30px; flex-wrap:wrap;"></div>
+
+        </section>
+
+        <!-- Advisor Chat Section (Student side) -->
+        <section id="advisor-chat" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">ðŸ’¬ My Advisor Chat</h2>
+            </div>
+            <div class="card student-advisor-chat-card">
+                <!-- Advisor Info Sidebar -->
+                <div class="student-advisor-chat-sidebar">
+                    <div id="studentAdvisorInfo" class="student-advisor-profile">
+                        <div class="student-advisor-avatar" id="studentAdvisorAvatar">?</div>
+                        <div class="student-advisor-copy">
+                            <div class="student-advisor-name" id="studentAdvisorName">Loading...</div>
+                            <div class="student-advisor-role">Your Academic Advisor</div>
+                        </div>
+                    </div>
+                    <div class="student-advisor-note">Messages are private between you and your advisor.</div>
+                </div>
+
+                <!-- Chat Window -->
+                <div class="student-advisor-chat-main">
+                    <div id="studentChatMessages" class="student-advisor-chat-messages">
+                        <div style="text-align:center;color:var(--muted);font-size:0.9rem">Loading messages...</div>
+                    </div>
+                    <div class="student-advisor-composer">
+                        <textarea id="studentChatInput" rows="1" placeholder="Type a message to your advisorâ€¦"
+                            class="student-advisor-input"
+                            onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+                        <button class="student-advisor-send" onclick="studentSendMessage()" title="Send message" aria-label="Send message"
+                            onmouseover="this.style.opacity=0.85" onmouseout="this.style.opacity=1">âž¤</button>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Advisor Meetups Section (Student side) -->
+        <section id="advisor-meetups" class="page">
+            <div class="page-header">
+                <h2 style="margin:0">Advisor Meetups</h2>
+            </div>
+
+            <div id="chatMeetupPanel" class="card" style="margin:0 auto;padding:32px 46px;border-radius:22px;border:1px solid rgba(139,92,246,0.35);background:rgba(15,23,42,0.62);max-width:1640px">
+                <div id="chat-meetup-slots" style="min-height:88px;border:1px solid rgba(139,92,246,0.32);border-radius:24px;background:rgba(30,41,59,0.46);padding:26px 44px;color:var(--text)">
+                    <div style="font-weight:800;font-size:1.05rem;margin-bottom:14px">Book an Appointment</div>
+                    <div style="color:var(--muted)">Loading slots...</div>
+                </div>
+
+                <div style="margin-top:28px">
+                    <label style="display:block;text-transform:uppercase;font-weight:800;letter-spacing:0.04em;color:var(--text);font-size:0.92rem;margin-bottom:8px">Select Date</label>
+                    <select id="chat-meetup-date" class="input" onchange="loadChatMeetupWindows()" style="display:none;max-width:360px;height:58px;border-radius:14px;font-weight:700;font-size:1rem;background:#334155"></select>
+                </div>
+
+                <div style="margin-top:22px">
+                    <label style="display:block;text-transform:uppercase;font-weight:800;letter-spacing:0.04em;color:var(--text);font-size:0.92rem;margin-bottom:12px">Available Times</label>
+                    <div id="chat-meetup-windows" style="display:flex;flex-wrap:wrap;gap:10px;min-height:46px;color:var(--muted)"></div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+                    <div>
+                        <label style="display:block;font-weight:800;color:var(--text);font-size:0.92rem;margin-bottom:8px">Purpose</label>
+                        <select id="chat-meetup-purpose" class="input" style="display:none;height:56px;border-radius:14px;font-weight:700;background:#334155">
+                            <option value="inquiry">Inquiry</option>
+                            <option value="complaint">Complaint</option>
+                            <option value="request">Request</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-weight:800;color:var(--text);font-size:0.92rem;margin-bottom:8px">Brief Notes (optional)</label>
+                        <input id="chat-meetup-reason" class="input" placeholder="What do you need help with?" style="display:none;height:56px;border-radius:14px;background:#334155">
+                    </div>
+                </div>
+
+                <button id="chat-meetup-submit" class="btn" onclick="submitChatMeetupBooking()" disabled style="min-width:270px;margin-top:24px;display:none;border-radius:14px;padding:16px 24px;font-weight:800;opacity:0.55">Confirm Appointment</button>
+
+                <div id="chat-meetup-appointments" style="margin-top:46px">
+                    <h3 style="margin:0 0 16px;font-size:1.1rem;font-weight:800">My Appointments</h3>
+                    <div id="chat-meetup-appointments-list" style="color:var(--muted)">Loading appointments...</div>
+                </div>
+            </div>
         </section>
 
     </main>
 
+    <div id="summer-request-modal" class="subjects-modal" aria-hidden="true">
+        <div class="modal-content" style="max-width:560px">
+            <div class="modal-header">
+                <h2><i class="fas fa-sun" style="color:#f59e0b"></i> New Summer Request</h2>
+                <button onclick="closeSummerRequestModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Course</label>
+                    <select id="summer-request-course-id" class="input">
+                        <option value="">Loading courses...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Semester</label>
+                    <input id="summer-request-semester" class="input" value="Summer 2026">
+                </div>
+                <div class="form-group">
+                    <label>Reason (optional)</label>
+                    <textarea id="summer-request-reason" class="input" rows="4" placeholder="Why do you want to take this course in summer?"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeSummerRequestModal()" class="link-btn">Cancel</button>
+                <button onclick="submitSummerRequest()" class="btn">Submit Request</button>
+            </div>
+        </div>
+    </div>
+
     <!-- AI Bubble -->
-    <div id="aiBubble" class="ai-bubble" onclick="toggleAIPopup()">🤖</div>
+    <div id="aiBubble" class="ai-bubble" onclick="toggleAIPopup()">ðŸ¤–</div>
 
     <div id="ats-modal" class="ats-modal" aria-hidden="true">
         <div class="ats-modal-backdrop" onclick="closeATSReport()"></div>
         <div class="ats-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ats-modal-title">
-            <button class="ats-modal-close" type="button" onclick="closeATSReport()" aria-label="Close ATS report">×</button>
+            <button class="ats-modal-close" type="button" onclick="closeATSReport()" aria-label="Close ATS report">Ã—</button>
             <div class="ats-modal-header">
                 <div>
                     <div class="ats-modal-kicker">Resume Intelligence</div>
@@ -1063,7 +1259,8 @@
     </div>
 
     <!-- JavaScript -->
-    <script src="js/backend_api.js"></script>
-    <script src="js/home_script.js"></script>
+    <script src="js/backend_api.js?v=15"></script>
+    <script src="js/home_script.js?v=15"></script>
 </body>
 </html>
+
